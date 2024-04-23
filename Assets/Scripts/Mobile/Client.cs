@@ -6,7 +6,8 @@ public class Client : MonoBehaviour
     public uint uid;
 
     private UdpClient _server;
-    //public string name;
+    
+    private string _name;
 
     // Start is called before the first frame update
     void Start()

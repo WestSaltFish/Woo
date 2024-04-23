@@ -18,7 +18,9 @@ public class Server : MonoBehaviour
     private byte[] _receiveData = null;
 
     private IPEndPoint _remotePoint = new IPEndPoint(IPAddress.Any, 8888);
-    
+
+    private readonly object _lock = new();
+
     // Server data
     private bool _connected = false;
 
@@ -63,7 +65,7 @@ public class Server : MonoBehaviour
             }
             else
             {
-                Console.WriteLine("Error receiving data: {0}", ex.Message);
+                Console.WriteLine("Error receiving data: {0}.", ex.Message);
             }
         }
 
