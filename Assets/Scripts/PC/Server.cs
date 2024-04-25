@@ -4,6 +4,7 @@ using System.Net;
 using System.Net.Sockets;
 using System.Text;
 using System.Threading;
+using Unity.VisualScripting;
 using UnityEngine;
 
 public class Server : MonoBehaviour
@@ -17,7 +18,7 @@ public class Server : MonoBehaviour
 
     private byte[] _receiveData = null;
 
-    private IPEndPoint _remotePoint = new IPEndPoint(IPAddress.Any, 8888);
+    private IPEndPoint _remotePoint = new (IPAddress.Any, 8888);
 
     private readonly object _lock = new();
 
@@ -40,37 +41,86 @@ public class Server : MonoBehaviour
     // Start is called before the first frame update
     void Start()
     {
-        Thread thread = new(StartServer);
+        StartServerAsync();
 
-        thread.Start();
+        //Thread thread = new(StartServer);
+
+        //thread.Start();
+    }
+
+    async private void StartServerAsync()
+    {
+        _server = new(8888);
+        _connected = true;
+
+        while (_connected)
+        {
+            try
+            {
+                // Receive result async
+                UdpReceiveResult result = await _server.ReceiveAsync();
+
+                // get message
+                string receivedMessage = Encoding.UTF8.GetString(result.Buffer);
+                IPEndPoint remoteEndPoint = result.RemoteEndPoint;
+
+                Debug.Log($"Receive from {remoteEndPoint} | Message: {receivedMessage}");
+            }
+            catch (Exception ex)
+            {
+                if (!_connected)
+                {
+                    Debug.Log("Server already closed!");
+                    break;
+                }
+
+                Debug.Log($"Error: {ex.Message}");
+
+                if (_server != null)
+                    _server.Close();
+
+                _connected = false;
+
+                break;
+            }
+        }
     }
 
     void StartServer()
     { 
         _server = new(8888);
+        _connected = true;
+
         Debug.Log("Server created!");
 
-        try
+        while(_connected)
         {
-            _receiveData = _server.Receive(ref _remotePoint); // stuck the program
-            Debug.Log("Message received!");
-            _receiveString = Encoding.Default.GetString(_receiveData);
-            Debug.Log(_receiveString);
-        }
-        catch (SocketException ex)
-        {
-            if (ex.ErrorCode == 10004) // Socket error: An operation was aborted due to a signal from the user.
+            try
             {
-                Console.WriteLine("Receive operation was canceled.");
+                _receiveData = _server.Receive(ref _remotePoint); // stuck the program
+                Debug.Log("Message received!");
+                _receiveString = Encoding.Default.GetString(_receiveData);
+                Debug.Log(_receiveString);
             }
-            else
+            catch (SocketException ex)
             {
-                Console.WriteLine("Error receiving data: {0}.", ex.Message);
-            }
-        }
+                if (ex.ErrorCode == 10004) // Socket error: An operation was aborted due to a signal from the user.
+                {
+                    Console.WriteLine("Receive operation was canceled.");
+                }
+                else
+                {
+                    Console.WriteLine("Error receiving data: {0}.", ex.Message);
+                }
 
-        if (_server != null) 
-            _server.Close();
+                if (_server != null)
+                    _server.Close();
+
+                _connected = false;
+
+                break;
+            }
+        }
     }
 
 
@@ -84,6 +134,7 @@ public class Server : MonoBehaviour
     {
         if (_server != null) 
         {
+            _connected = false;
             _server.Close();
             _server = null;
             Debug.Log("Server closed!");
