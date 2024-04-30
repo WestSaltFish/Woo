@@ -11,6 +11,7 @@ public enum NetworkMessageType
     LeaveServer,
     Heartbeat,
     CloseServer,
+    Message,
     MaxCount,
 }
 
@@ -79,21 +80,21 @@ public class NetworkMessage
 
 public class NetworkMessageFactory
 {
-    static NetworkPackage JoinServerMessage(string userName)
+    static public NetworkPackage JoinServerMessage(string userName)
     {
         JoinServer msg = new(userName);
 
         return new NetworkPackage(NetworkMessageType.JoinServer, msg.GetBytes());
     }
 
-    static NetworkPackage HeartBeatMessage(uint uid)
+    static public NetworkPackage HeartBeatMessage(uint uid)
     {
         HearthBeat msg = new(uid);
 
         return new NetworkPackage(NetworkMessageType.Heartbeat, msg.GetBytes());
     }
 
-    static NetworkPackage LeaveServertMessage(uint uid)
+    static public NetworkPackage LeaveServertMessage(uint uid)
     {
         LeaveServer msg = new(uid);
 
@@ -150,4 +151,21 @@ public class LeaveServer : NetworkMessage
     {
         return JsonUtility.FromJson<LeaveServer>(Encoding.ASCII.GetString(data, 0, data.Length));
     }
+}
+
+[Serializable]
+public class Message : NetworkMessage
+{
+    public Message(uint userId, string message) : base(NetworkMessageType.Message, userId)
+    {
+        this.message = message;
+    }
+
+    static public LeaveServer GetData(byte[] data)
+    {
+        return JsonUtility.FromJson<LeaveServer>(Encoding.ASCII.GetString(data, 0, data.Length));
+    }
+
+    // 4 server
+    public string message;
 }

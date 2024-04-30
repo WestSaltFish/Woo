@@ -2,6 +2,8 @@ using System;
 using System.Net;
 using System.Net.Sockets;
 using System.Text;
+using System.Threading;
+using System.Threading.Tasks;
 using UnityEngine;
 
 public class Client : MonoBehaviour
@@ -37,12 +39,32 @@ public class Client : MonoBehaviour
         _client?.Send(data, data.Length, _serverEndPoint);
     }
 
-    private void ConnecteToServer()
+    private async void ConnecteToServer()
     {
+        // Get Server Port
         _serverEndPoint = new IPEndPoint(IPAddress.Parse("127.0.0.1"), _serverPort);
 
-        _client = new UdpClient();
+        // Init client udp
+        _client = new();
 
+        try
+        {
+            _client.Connect(_serverEndPoint);
+
+            byte[] data = NetworkMessageFactory.JoinServerMessage("Chen").GetBytes();
+
+            int bytesSent = await _client.SendAsync(data, data.Length);
+
+            Debug.Log($"Sent {bytesSent} bytes to {_serverEndPoint}.");
+        }
+        catch (Exception ex)
+        {
+            Debug.LogWarning($"Connecting error : {ex.Message}.");
+
+            return;
+        }
+
+        // temporal
         _connected = true;
 
         ReceiveMessagesAsync();

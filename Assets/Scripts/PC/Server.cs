@@ -6,17 +6,19 @@ using UnityEngine;
 
 public class MessageHandler
 {
-    public MessageHandler(NetworkMessage message)
+    public MessageHandler(NetworkMessage message, Action<NetworkMessage> action)
     {
         _message = message;
+        _action = action;
     }
 
     public void Execute()
     {
-        //_action.Invoke(_message);
+        _action.Invoke(_message);
     }
 
     private readonly NetworkMessage _message;
+    private readonly Action<NetworkMessage> _action;
 }
 
 public class Server : MonoBehaviour
@@ -25,8 +27,6 @@ public class Server : MonoBehaviour
 
     // Server conection
     private UdpClient _server;
-
-    private byte[] _receiveData = null;
 
     //private IPEndPoint _remotePoint = new (IPAddress.Any, 8888);
 
@@ -38,6 +38,8 @@ public class Server : MonoBehaviour
     private readonly Dictionary<uint, User> _users = new();
 
     private readonly ConcurrentQueue<MessageHandler> _tasks = new();
+
+    private readonly Dictionary<NetworkMessageType, Action<NetworkMessage>> _actionHandles = new();
 
     [HideInInspector]
     private uint _UID = 0;
@@ -53,6 +55,8 @@ public class Server : MonoBehaviour
     // Start is called before the first frame update
     void Start()
     {
+        _actionHandles.Add(NetworkMessageType.JoinServer, HandleJoinServer);
+        
         StartServerAsync();
 
         //Thread thread = new(StartServer);
@@ -87,7 +91,7 @@ public class Server : MonoBehaviour
 
                 //Debug.Log($"Receive from {remoteEndPoint} | Message: {receivedMessage}");
 
-                _tasks.Enqueue(new(message));
+                _tasks.Enqueue(new(message, _actionHandles[message.type]));
 
                 // Convert the message to a byte array
                 //byte[] data = Encoding.ASCII.GetBytes("Hello" + remoteEndPoint);
@@ -117,7 +121,11 @@ public class Server : MonoBehaviour
     // Update is called once per frame
     void Update()
     {
-           
+        if (_tasks.Count > 0)
+        {
+            if (_tasks.TryDequeue(out MessageHandler task))
+                task.Execute();
+        }
     }
 
     private void OnDestroy()
@@ -141,6 +149,11 @@ public class Server : MonoBehaviour
     uint getNextUID()
     {
         return _UID++;
+    }
+
+    private void HandleJoinServer(NetworkMessage msg)
+    {
+        Debug.Log("Receive info");
     }
 
     // obsolete
@@ -180,5 +193,5 @@ public class Server : MonoBehaviour
             }
         }
     }
-        */
+    */
 }
