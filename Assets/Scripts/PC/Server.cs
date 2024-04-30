@@ -1,9 +1,23 @@
 using System;
+using System.Collections.Concurrent;
 using System.Collections.Generic;
-using System.Net;
 using System.Net.Sockets;
-using System.Text;
 using UnityEngine;
+
+public class MessageHandler
+{
+    public MessageHandler(NetworkMessage message)
+    {
+        _message = message;
+    }
+
+    public void Execute()
+    {
+        //_action.Invoke(_message);
+    }
+
+    private readonly NetworkMessage _message;
+}
 
 public class Server : MonoBehaviour
 {
@@ -12,18 +26,18 @@ public class Server : MonoBehaviour
     // Server conection
     private UdpClient _server;
 
-    private string _receiveString = null;
-
     private byte[] _receiveData = null;
 
-    private IPEndPoint _remotePoint = new (IPAddress.Any, 8888);
+    //private IPEndPoint _remotePoint = new (IPAddress.Any, 8888);
 
     private readonly object _lock = new();
 
     // Server data
     private bool _connected = false;
 
-    private Dictionary<uint, User> _users = new();
+    private readonly Dictionary<uint, User> _users = new();
+
+    private readonly ConcurrentQueue<MessageHandler> _tasks = new();
 
     [HideInInspector]
     private uint _UID = 0;
@@ -51,7 +65,7 @@ public class Server : MonoBehaviour
         _server = new(8888);
         _connected = true;
 
-        Debug.Log("Server created!");
+        Debug.Log("Server Start!");
 
         ListenForClientAsync();
     }
@@ -66,27 +80,30 @@ public class Server : MonoBehaviour
                 UdpReceiveResult result = await _server.ReceiveAsync();
 
                 // get message
-                string receivedMessage = Encoding.UTF8.GetString(result.Buffer);
-                IPEndPoint remoteEndPoint = result.RemoteEndPoint;
+                NetworkMessage message = NetworkPackage.GetDataFromBytes(result.Buffer, result.Buffer.Length);
 
-                Debug.Log($"Receive from {remoteEndPoint} | Message: {receivedMessage}");
+                // get user endPoint
+                //IPEndPoint remoteEndPoint = result.RemoteEndPoint;
 
-                // we can get client endPoint
+                //Debug.Log($"Receive from {remoteEndPoint} | Message: {receivedMessage}");
+
+                _tasks.Enqueue(new(message));
+
                 // Convert the message to a byte array
-                byte[] data = Encoding.ASCII.GetBytes("Hello" + remoteEndPoint);
+                //byte[] data = Encoding.ASCII.GetBytes("Hello" + remoteEndPoint);
 
                 // Send the data to the server
-                _server?.Send(data, data.Length, remoteEndPoint);
+                //_server?.Send(data, data.Length, remoteEndPoint);
             }
             catch (Exception ex)
             {
                 if (!_connected)
                 {
-                    Debug.Log("Server already closed!");
+                    Debug.LogWarning("Server already closed!");
                     break;
                 }
 
-                Debug.Log($"Error: {ex.Message}");
+                Debug.LogWarning($"Error: {ex.Message}");
 
                 _server?.Close();
 
@@ -127,6 +144,7 @@ public class Server : MonoBehaviour
     }
 
     // obsolete
+    /*
     void StartServer()
     {
         _server = new(8888);
@@ -162,5 +180,5 @@ public class Server : MonoBehaviour
             }
         }
     }
-
+        */
 }

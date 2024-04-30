@@ -67,11 +67,11 @@ public class Client : MonoBehaviour
             {
                 if (!_connected)
                 {
-                    Debug.Log("Client already closed!");
+                    Debug.LogWarning("Client already closed!");
                 }
                 else
                 {
-                    Debug.Log($"Error receiving data: {ex.Message}.");
+                    Debug.LogWarning($"Error receiving data: {ex.Message}.");
                 }
 
                 //CloseClientUDP();
@@ -103,7 +103,7 @@ public class Client : MonoBehaviour
         {
             _client.Close();
             _client = null;
-            Debug.Log("Server close!");
+            Debug.Log("Client close!");
         }
     }
 }

@@ -1,12 +1,12 @@
 using System;
 using System.Collections.Generic;
-using System.Net;
 using System.Text;
+using Unity.VisualScripting;
 using UnityEngine;
 
 public enum NetworkMessageType
 {
-    Null,
+    None,
     JoinServer,
     LeaveServer,
     Heartbeat,
@@ -46,9 +46,7 @@ public class NetworkPackage
 
     public byte[] data;
 
-    private delegate NetworkMessage GetDataAction(byte[] data);
-
-    static private Dictionary<NetworkMessageType, GetDataAction> _getDataActions = new()
+    private static readonly Dictionary<NetworkMessageType, Func<byte[],NetworkMessage>> _getDataActions = new()
     {
         { NetworkMessageType.Heartbeat, HearthBeat.GetData },
         { NetworkMessageType.JoinServer, JoinServer.GetData },
@@ -71,17 +69,41 @@ public class NetworkMessage
     }
 
     // 4 server & client
-    public NetworkMessageType type = NetworkMessageType.Null;
+    public NetworkMessageType type = NetworkMessageType.None;
 
     public uint messageOwnerId = 0;
 
     // 4 client
     public bool succesful = false;
-
-    public EndPoint endPoint = null;
-
-    public EndPoint testEndPoint = null;
 }
+
+public class NetworkMessageFactory
+{
+    static NetworkPackage JoinServerMessage(string userName)
+    {
+        JoinServer msg = new(userName);
+
+        return new NetworkPackage(NetworkMessageType.JoinServer, msg.GetBytes());
+    }
+
+    static NetworkPackage HeartBeatMessage(uint uid)
+    {
+        HearthBeat msg = new(uid);
+
+        return new NetworkPackage(NetworkMessageType.Heartbeat, msg.GetBytes());
+    }
+
+    static NetworkPackage LeaveServertMessage(uint uid)
+    {
+        LeaveServer msg = new(uid);
+
+        return new NetworkPackage(NetworkMessageType.LeaveServer, msg.GetBytes());
+    }
+}
+
+// -----------------------------------------------
+// ------------REQUEST IN THE SERVER--------------
+// -----------------------------------------------
 
 [Serializable]
 public class HearthBeat : NetworkMessage
@@ -99,10 +121,6 @@ public class HearthBeat : NetworkMessage
     }
 }
 
-// -----------------------------------------------
-// ------------REQUEST IN THE SERVER--------------
-// -----------------------------------------------
-
 [Serializable]
 public class JoinServer : NetworkMessage
 {
@@ -118,11 +136,6 @@ public class JoinServer : NetworkMessage
 
     // 4 server
     public string name;
-
-    // 4 clients
-    public List<uint> roomsId = null;
-    public List<int> currentPlayers = null;
-    public List<int> maxPlayers = null;
 }
 
 [Serializable]
