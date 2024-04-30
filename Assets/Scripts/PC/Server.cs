@@ -3,8 +3,6 @@ using System.Collections.Generic;
 using System.Net;
 using System.Net.Sockets;
 using System.Text;
-using System.Threading;
-using Unity.VisualScripting;
 using UnityEngine;
 
 public class Server : MonoBehaviour
@@ -25,7 +23,7 @@ public class Server : MonoBehaviour
     // Server data
     private bool _connected = false;
 
-    private Dictionary<uint, Client> _clients = new();
+    private Dictionary<uint, User> _users = new();
 
     [HideInInspector]
     private uint _UID = 0;
@@ -48,11 +46,18 @@ public class Server : MonoBehaviour
         //thread.Start();
     }
 
-    async private void StartServerAsync()
+    private void StartServerAsync()
     {
         _server = new(8888);
         _connected = true;
 
+        Debug.Log("Server created!");
+
+        ListenForClientAsync();
+    }
+
+    async private void ListenForClientAsync()
+    {
         while (_connected)
         {
             try
@@ -65,6 +70,13 @@ public class Server : MonoBehaviour
                 IPEndPoint remoteEndPoint = result.RemoteEndPoint;
 
                 Debug.Log($"Receive from {remoteEndPoint} | Message: {receivedMessage}");
+
+                // we can get client endPoint
+                // Convert the message to a byte array
+                byte[] data = Encoding.ASCII.GetBytes("Hello" + remoteEndPoint);
+
+                // Send the data to the server
+                _server?.Send(data, data.Length, remoteEndPoint);
             }
             catch (Exception ex)
             {
@@ -76,8 +88,7 @@ public class Server : MonoBehaviour
 
                 Debug.Log($"Error: {ex.Message}");
 
-                if (_server != null)
-                    _server.Close();
+                _server?.Close();
 
                 _connected = false;
 
@@ -86,14 +97,44 @@ public class Server : MonoBehaviour
         }
     }
 
+    // Update is called once per frame
+    void Update()
+    {
+           
+    }
+
+    private void OnDestroy()
+    {
+        CloseServerUDP();
+    }
+
+    private void CloseServerUDP()
+    {
+        _connected = false;
+
+        if (_server != null)
+        {
+            _connected = false;
+            _server.Close();
+            _server = null;
+            Debug.Log("Server close!");
+        }
+    }
+
+    uint getNextUID()
+    {
+        return _UID++;
+    }
+
+    // obsolete
     void StartServer()
-    { 
+    {
         _server = new(8888);
         _connected = true;
 
         Debug.Log("Server created!");
 
-        while(_connected)
+        while (_connected)
         {
             try
             {
@@ -113,8 +154,7 @@ public class Server : MonoBehaviour
                     Console.WriteLine("Error receiving data: {0}.", ex.Message);
                 }
 
-                if (_server != null)
-                    _server.Close();
+                _server?.Close();
 
                 _connected = false;
 
@@ -123,26 +163,4 @@ public class Server : MonoBehaviour
         }
     }
 
-
-    // Update is called once per frame
-    void Update()
-    {
-           
-    }
-
-    private void OnDestroy()
-    {
-        if (_server != null) 
-        {
-            _connected = false;
-            _server.Close();
-            _server = null;
-            Debug.Log("Server closed!");
-        }      
-    }
-
-    uint getNextUID()
-    {
-        return _UID++;
-    }
 }

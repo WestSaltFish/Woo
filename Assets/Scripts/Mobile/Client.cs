@@ -2,9 +2,6 @@ using System;
 using System.Net;
 using System.Net.Sockets;
 using System.Text;
-using System.Threading;
-using UnityEditor.PackageManager;
-using UnityEditor.VersionControl;
 using UnityEngine;
 
 public class Client : MonoBehaviour
@@ -19,15 +16,11 @@ public class Client : MonoBehaviour
 
     private IPEndPoint _serverEndPoint;
 
+    private bool _connected = false;
+
     private void Start()
     {
-        _serverEndPoint = new IPEndPoint(IPAddress.Parse("127.0.0.1"), _serverPort);
-
-        _client = new UdpClient();
-
-        Thread receiveThread = new Thread(ReceiveMessages);
-
-        receiveThread.Start();
+        ConnecteToServer();
     }
 
     public void SetServerPort(int port)
@@ -35,51 +28,62 @@ public class Client : MonoBehaviour
         _serverPort = port;
     }
 
-    public void ConnecteToServer()
+    void TestSendMessage()
     {
         // Convert the message to a byte array
         byte[] data = Encoding.ASCII.GetBytes("hi");
 
         // Send the data to the server
-        _client.Send(data, data.Length, _serverEndPoint);
+        _client?.Send(data, data.Length, _serverEndPoint);
     }
 
-    private void ReceiveMessages()
+    private void ConnecteToServer()
     {
-        while (true)
+        _serverEndPoint = new IPEndPoint(IPAddress.Parse("127.0.0.1"), _serverPort);
+
+        _client = new UdpClient();
+
+        _connected = true;
+
+        ReceiveMessagesAsync();
+    }
+
+    async private void ReceiveMessagesAsync()
+    {
+        while (_connected)
         {
             try
             {
-                byte[] receiveBuffer = _client.Receive(ref _serverEndPoint);
+                // Receive result async
+                UdpReceiveResult result = await _client.ReceiveAsync();
 
-                if (receiveBuffer.Length > 0)
-                {
-                    string message = Encoding.ASCII.GetString(receiveBuffer, 0, receiveBuffer.Length);
-                    Debug.Log("Received message from server: " + message);
-                }
+                // get message
+                string receivedMessage = Encoding.UTF8.GetString(result.Buffer);
+                IPEndPoint remoteEndPoint = result.RemoteEndPoint;
+
+                Debug.Log($"Receive from {remoteEndPoint} | Message: {receivedMessage}");
             }
-            catch (SocketException ex)
+            catch (Exception ex)
             {
-                if (ex.ErrorCode == 10004) // Socket error: An operation was aborted due to a signal from the user.
+                if (!_connected)
                 {
-                    Console.WriteLine("Receive operation was canceled.");
+                    Debug.Log("Client already closed!");
                 }
                 else
                 {
-                    Console.WriteLine("Error receiving data: {0}.", ex.Message);
+                    Debug.Log($"Error receiving data: {ex.Message}.");
                 }
-            }
 
-            break;
+                //CloseClientUDP();
+
+                break;
+            }
         }
     }
-    private void OnApplicationQuit()
+
+    private void OnDestroy()
     {
-        if (_client != null)
-        {
-            _client.Close();
-            _client = null;
-        }
+        CloseClientUDP();
     }
 
     private void Update()
@@ -87,7 +91,19 @@ public class Client : MonoBehaviour
         // Send message to server
         if (Input.GetKeyDown(KeyCode.S))
         {
-            ConnecteToServer();
+            TestSendMessage();
+        }
+    }
+
+    private void CloseClientUDP()
+    {
+        _connected = false;
+
+        if (_client != null)
+        {
+            _client.Close();
+            _client = null;
+            Debug.Log("Server close!");
         }
     }
 }
