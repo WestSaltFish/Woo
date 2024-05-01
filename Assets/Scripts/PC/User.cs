@@ -1,21 +1,15 @@
 using System.Net;
-using UnityEngine;
 
-public class User : MonoBehaviour
+public class User
 {
+    public User(string name, IPEndPoint endPoint, uint uid)
+    {
+        userName = name;
+        userEndPoint = endPoint;
+        this.uid = uid;
+    }
+
     public string userName = "Default";
-    public IPEndPoint clientEndPoint;
+    public IPEndPoint userEndPoint;
     public uint uid = 0;
-
-    // Start is called before the first frame update
-    void Start()
-    {
-        
-    }
-
-    // Update is called once per frame
-    void Update()
-    {
-        
-    }
 }

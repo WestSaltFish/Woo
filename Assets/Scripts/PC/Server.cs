@@ -43,25 +43,35 @@ public class Server : MonoBehaviour
 
     [HideInInspector]
     private uint _UID = 0;
-    
+
     public void Awake()
     {
         if (instance != null)
             Destroy(gameObject);
         else
-            instance = this;     
+            instance = this;
     }
 
     // Start is called before the first frame update
     void Start()
     {
         _actionHandles.Add(NetworkMessageType.JoinServer, HandleJoinServer);
-        
+
         StartServerAsync();
+    }
 
-        //Thread thread = new(StartServer);
+    void Update()
+    {
+        if (_tasks.Count > 0)
+        {
+            if (_tasks.TryDequeue(out MessageHandler task))
+                task.Execute();
+        }
+    }
 
-        //thread.Start();
+    private void OnDestroy()
+    {
+        CloseServerUDP();
     }
 
     private void StartServerAsync()
@@ -86,8 +96,7 @@ public class Server : MonoBehaviour
                 // get message
                 NetworkMessage message = NetworkPackage.GetDataFromBytes(result.Buffer, result.Buffer.Length);
 
-                // get user endPoint
-                //IPEndPoint remoteEndPoint = result.RemoteEndPoint;
+                message.endPoint = result.RemoteEndPoint;
 
                 //Debug.Log($"Receive from {remoteEndPoint} | Message: {receivedMessage}");
 
@@ -119,19 +128,7 @@ public class Server : MonoBehaviour
     }
 
     // Update is called once per frame
-    void Update()
-    {
-        if (_tasks.Count > 0)
-        {
-            if (_tasks.TryDequeue(out MessageHandler task))
-                task.Execute();
-        }
-    }
-
-    private void OnDestroy()
-    {
-        CloseServerUDP();
-    }
+   
 
     private void CloseServerUDP()
     {
@@ -146,14 +143,44 @@ public class Server : MonoBehaviour
         }
     }
 
-    uint getNextUID()
+    private uint GetNextUID()
     {
-        return _UID++;
+        return ++_UID;
     }
 
-    private void HandleJoinServer(NetworkMessage msg)
+    public async void SendMessageToClient(User user, NetworkMessage message)
     {
-        Debug.Log("Receive info");
+        Debug.Log("Server: send messages [" + message.type + "] to client (" + user.userName + ")");
+
+        NetworkPackage package = new(message.type, message.GetBytes());
+
+        byte[] data = package.GetBytes();
+
+        await  _server.SendAsync(data, data.Length, user.userEndPoint);
+
+        Debug.Log($"Message send to {user.userEndPoint} sucessful");
+    }
+
+    private void HandleJoinServer(NetworkMessage data)
+    {
+        var message = data as JoinServer;
+
+        if (!_users.ContainsKey(message.messageOwnerId))
+        {
+            User user = new(message.name,message.endPoint,GetNextUID());
+            
+            _users.Add(user.uid, user);
+
+            message.messageOwnerId = user.uid;
+
+            Debug.Log($"User with endPoint {message.endPoint} join successfull");
+        }
+
+        Debug.Log($"User with endPoint {message.endPoint} was already in the server");
+
+        message.succesful = true;
+
+        SendMessageToClient(_users[message.messageOwnerId], message);
     }
 
     // obsolete

@@ -1,9 +1,9 @@
 using System;
+using System.Collections.Concurrent;
+using System.Collections.Generic;
 using System.Net;
 using System.Net.Sockets;
 using System.Text;
-using System.Threading;
-using System.Threading.Tasks;
 using UnityEngine;
 
 public class Client : MonoBehaviour
@@ -20,9 +20,37 @@ public class Client : MonoBehaviour
 
     private bool _connected = false;
 
+    private readonly ConcurrentQueue<MessageHandler> _tasks = new();
+
+    private readonly Dictionary<NetworkMessageType, Action<NetworkMessage>> _actionHandles = new();
+
     private void Start()
     {
+        _actionHandles.Add(NetworkMessageType.JoinServer, HandleJoinServer);
+
         ConnecteToServer();
+    }
+
+
+
+    private void Update()
+    {
+        if (_tasks.Count > 0)
+        {
+            if (_tasks.TryDequeue(out MessageHandler task))
+                task.Execute();
+        }
+
+        // Send message to server
+        if (Input.GetKeyDown(KeyCode.S))
+        {
+            TestSendMessage();
+        }
+    }
+
+    private void OnDestroy()
+    {
+        CloseClientUDP();
     }
 
     public void SetServerPort(int port)
@@ -80,10 +108,9 @@ public class Client : MonoBehaviour
                 UdpReceiveResult result = await _client.ReceiveAsync();
 
                 // get message
-                string receivedMessage = Encoding.UTF8.GetString(result.Buffer);
-                IPEndPoint remoteEndPoint = result.RemoteEndPoint;
+                NetworkMessage message = NetworkPackage.GetDataFromBytes(result.Buffer, result.Buffer.Length);
 
-                Debug.Log($"Receive from {remoteEndPoint} | Message: {receivedMessage}");
+                _tasks.Enqueue(new(message, _actionHandles[message.type]));
             }
             catch (Exception ex)
             {
@@ -103,20 +130,6 @@ public class Client : MonoBehaviour
         }
     }
 
-    private void OnDestroy()
-    {
-        CloseClientUDP();
-    }
-
-    private void Update()
-    {
-        // Send message to server
-        if (Input.GetKeyDown(KeyCode.S))
-        {
-            TestSendMessage();
-        }
-    }
-
     private void CloseClientUDP()
     {
         _connected = false;
@@ -126,6 +139,16 @@ public class Client : MonoBehaviour
             _client.Close();
             _client = null;
             Debug.Log("Client close!");
+        }
+    }
+
+    private void HandleJoinServer(NetworkMessage data)
+    {
+        var message = data as JoinServer;
+
+        if (message.succesful)
+        {
+            Debug.Log("Join server succesful");
         }
     }
 }

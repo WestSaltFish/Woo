@@ -1,7 +1,7 @@
 using System;
 using System.Collections.Generic;
+using System.Net;
 using System.Text;
-using Unity.VisualScripting;
 using UnityEngine;
 
 public enum NetworkMessageType
@@ -73,6 +73,8 @@ public class NetworkMessage
     public NetworkMessageType type = NetworkMessageType.None;
 
     public uint messageOwnerId = 0;
+
+    public IPEndPoint endPoint = null;
 
     // 4 client
     public bool succesful = false;
