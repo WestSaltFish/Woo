@@ -4,45 +4,23 @@ using System.Collections.Generic;
 using System.Net.Sockets;
 using UnityEngine;
 
-public class MessageHandler
-{
-    public MessageHandler(NetworkMessage message, Action<NetworkMessage> action)
-    {
-        _message = message;
-        _action = action;
-    }
-
-    public void Execute()
-    {
-        _action.Invoke(_message);
-    }
-
-    private readonly NetworkMessage _message;
-    private readonly Action<NetworkMessage> _action;
-}
-
 public class Server : MonoBehaviour
 {
+    // Singleton instance
     public static Server instance = null;
 
     // Server conection
     private UdpClient _server;
-
-    //private IPEndPoint _remotePoint = new (IPAddress.Any, 8888);
-
     private readonly object _lock = new();
 
     // Server data
-    private bool _connected = false;
-
+    [SerializeField, Disable] private bool _connected = false;
     private readonly Dictionary<uint, User> _users = new();
-
     private readonly ConcurrentQueue<MessageHandler> _tasks = new();
-
     private readonly Dictionary<NetworkMessageType, Action<NetworkMessage>> _actionHandles = new();
 
-    [HideInInspector]
-    private uint _UID = 0;
+    // to generate user uid
+    private uint _genUID = 0;
 
     public void Awake()
     {
@@ -145,7 +123,7 @@ public class Server : MonoBehaviour
 
     private uint GetNextUID()
     {
-        return ++_UID;
+        return ++_genUID;
     }
 
     public async void SendMessageToClient(User user, NetworkMessage message)

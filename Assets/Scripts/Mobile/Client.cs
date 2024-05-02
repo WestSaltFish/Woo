@@ -8,23 +8,18 @@ using UnityEngine;
 public class Client : MonoBehaviour
 {
     // User info
+    [Header("User params")]
     public uint uid = 0;
-
     private string _name = "default";
 
-    // network params
-    private UdpClient _client;
-
-    private IPEndPoint _serverEndPoint;
-
-    [SerializeField] private string _serverIp = "127.0.0.1";
-
+    // Network params
+    [Header("Network params")]
+    [SerializeField, Disable] private bool _connected = false;
+    [SerializeField, Disable] private string _serverIp = "127.0.0.1";
     [SerializeField] private int _serverPort = 8888;
-
-    [SerializeField, Unity.Collections.ReadOnly] private bool _connected = false;
-
+    private IPEndPoint _serverEndPoint;
+    private UdpClient _client;
     private readonly ConcurrentQueue<MessageHandler> _tasks = new();
-
     private readonly Dictionary<NetworkMessageType, Action<NetworkMessage>> _actionHandles = new();
 
     private void Start()

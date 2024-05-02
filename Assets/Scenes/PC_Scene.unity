@@ -164,6 +164,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: c5283aff8b40fad4996133a6828607b1, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
+  _connected: 0
 --- !u!1 &705507993
 GameObject:
   m_ObjectHideFlags: 0
@@ -380,9 +381,9 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: 
   uid: 0
+  _connected: 0
   _serverIp: 127.0.0.1
   _serverPort: 8888
-  _connected: 0
 --- !u!4 &976659936
 Transform:
   m_ObjectHideFlags: 0

@@ -1,6 +1,7 @@
 using UnityEditor;
 using UnityEngine;
 
+[CustomPropertyDrawer(typeof(Disable))]
 public class DisableDrawer : PropertyDrawer
 {
     // https://forum.unity.com/threads/freebie-disableif-property-attribute.520802/
