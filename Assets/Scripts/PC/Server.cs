@@ -128,7 +128,7 @@ public class Server : MonoBehaviour
     }
 
     // Update is called once per frame
-   
+
 
     private void CloseServerUDP()
     {
@@ -150,13 +150,13 @@ public class Server : MonoBehaviour
 
     public async void SendMessageToClient(User user, NetworkMessage message)
     {
-        Debug.Log("Server: send messages [" + message.type + "] to client (" + user.userName + ")");
+        Debug.Log($"Server: send messages [{message.type}] to client ({user.userName})");
 
         NetworkPackage package = new(message.type, message.GetBytes());
 
         byte[] data = package.GetBytes();
 
-        await  _server.SendAsync(data, data.Length, user.userEndPoint);
+        await _server.SendAsync(data, data.Length, user.userEndPoint);
 
         Debug.Log($"Message send to {user.userEndPoint} sucessful");
     }
@@ -165,22 +165,28 @@ public class Server : MonoBehaviour
     {
         var message = data as JoinServer;
 
-        if (!_users.ContainsKey(message.messageOwnerId))
+        if (!_users.ContainsKey(message.ownerUid))
         {
-            User user = new(message.name,message.endPoint,GetNextUID());
-            
+            User user = new(message.name, message.endPoint, GetNextUID());
+
+            message.ownerUid = user.uid;
+
             _users.Add(user.uid, user);
 
-            message.messageOwnerId = user.uid;
-
             Debug.Log($"User with endPoint {message.endPoint} join successfull");
+
+            message.successful = true;
+        }
+        else
+        {
+            message.successful = false;
+
+            message.errorCode = NetworkErrorCode.ClientAlreadyInTheServer;
+
+            Debug.LogWarning($"Server error : {message.errorCode}");
         }
 
-        Debug.Log($"User with endPoint {message.endPoint} was already in the server");
-
-        message.succesful = true;
-
-        SendMessageToClient(_users[message.messageOwnerId], message);
+        SendMessageToClient(_users[message.ownerUid], message);
     }
 
     // obsolete

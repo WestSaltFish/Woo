@@ -380,6 +380,9 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: 
   uid: 0
+  _serverIp: 127.0.0.1
+  _serverPort: 8888
+  _connected: 0
 --- !u!4 &976659936
 Transform:
   m_ObjectHideFlags: 0

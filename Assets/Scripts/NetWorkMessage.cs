@@ -15,6 +15,12 @@ public enum NetworkMessageType
     MaxCount,
 }
 
+public enum NetworkErrorCode
+{
+    None,
+    ClientAlreadyInTheServer
+}
+
 [Serializable]
 public class NetworkPackage
 {
@@ -58,10 +64,10 @@ public class NetworkPackage
 [Serializable]
 public class NetworkMessage
 {
-    protected NetworkMessage(NetworkMessageType type, uint messageOwnerId)
+    protected NetworkMessage(NetworkMessageType type, uint ownerUid)
     {
         this.type = type;
-        this.messageOwnerId = messageOwnerId;
+        this.ownerUid = ownerUid;
     }
 
     virtual public byte[] GetBytes()
@@ -72,12 +78,14 @@ public class NetworkMessage
     // 4 server & client
     public NetworkMessageType type = NetworkMessageType.None;
 
-    public uint messageOwnerId = 0;
+    public uint ownerUid = 0;
 
     public IPEndPoint endPoint = null;
 
+    public NetworkErrorCode errorCode = NetworkErrorCode.None;
+
     // 4 client
-    public bool succesful = false;
+    public bool successful = false;
 }
 
 public class NetworkMessageFactory
@@ -146,7 +154,7 @@ public class LeaveServer : NetworkMessage
 {
     public LeaveServer(uint userId, bool forceLeave = false) : base(NetworkMessageType.LeaveServer, userId)
     {
-        succesful = forceLeave;
+        successful = forceLeave;
     }
 
     static public LeaveServer GetData(byte[] data)

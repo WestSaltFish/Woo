@@ -3,22 +3,25 @@ using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Net;
 using System.Net.Sockets;
-using System.Text;
 using UnityEngine;
 
 public class Client : MonoBehaviour
 {
+    // User info
     public uint uid = 0;
 
+    private string _name = "default";
+
+    // network params
     private UdpClient _client;
-
-    private string _name;
-
-    private int _serverPort = 8888;
 
     private IPEndPoint _serverEndPoint;
 
-    private bool _connected = false;
+    [SerializeField] private string _serverIp = "127.0.0.1";
+
+    [SerializeField] private int _serverPort = 8888;
+
+    [SerializeField, Unity.Collections.ReadOnly] private bool _connected = false;
 
     private readonly ConcurrentQueue<MessageHandler> _tasks = new();
 
@@ -27,11 +30,7 @@ public class Client : MonoBehaviour
     private void Start()
     {
         _actionHandles.Add(NetworkMessageType.JoinServer, HandleJoinServer);
-
-        ConnecteToServer();
     }
-
-
 
     private void Update()
     {
@@ -44,7 +43,7 @@ public class Client : MonoBehaviour
         // Send message to server
         if (Input.GetKeyDown(KeyCode.S))
         {
-            TestSendMessage();
+            ConnecteToServer();
         }
     }
 
@@ -58,19 +57,10 @@ public class Client : MonoBehaviour
         _serverPort = port;
     }
 
-    void TestSendMessage()
-    {
-        // Convert the message to a byte array
-        byte[] data = Encoding.ASCII.GetBytes("hi");
-
-        // Send the data to the server
-        _client?.Send(data, data.Length, _serverEndPoint);
-    }
-
     private async void ConnecteToServer()
     {
         // Get Server Port
-        _serverEndPoint = new IPEndPoint(IPAddress.Parse("127.0.0.1"), _serverPort);
+        _serverEndPoint = new IPEndPoint(IPAddress.Parse(_serverIp), _serverPort);
 
         // Init client udp
         _client = new();
@@ -122,9 +112,6 @@ public class Client : MonoBehaviour
                 {
                     Debug.LogWarning($"Error receiving data: {ex.Message}.");
                 }
-
-                //CloseClientUDP();
-
                 break;
             }
         }
@@ -146,9 +133,14 @@ public class Client : MonoBehaviour
     {
         var message = data as JoinServer;
 
-        if (message.succesful)
+        if (message.successful)
         {
+            uid = message.ownerUid;
             Debug.Log("Join server succesful");
+        }
+        else
+        {
+            Debug.Log($"User error: {message.errorCode}");
         }
     }
 }
