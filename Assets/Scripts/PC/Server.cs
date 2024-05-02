@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
+using System.Net;
 using System.Net.Sockets;
 using UnityEngine;
 
@@ -10,6 +11,7 @@ public class Server : MonoBehaviour
     public static Server instance = null;
 
     // Server conection
+    [SerializeField] private int _port = 8888;
     private UdpClient _server;
     private readonly object _lock = new();
 
@@ -22,6 +24,8 @@ public class Server : MonoBehaviour
     // to generate user uid
     private uint _genUID = 0;
 
+
+    #region Unity events
     public void Awake()
     {
         if (instance != null)
@@ -30,10 +34,10 @@ public class Server : MonoBehaviour
             instance = this;
     }
 
-    // Start is called before the first frame update
     void Start()
     {
         _actionHandles.Add(NetworkMessageType.JoinServer, HandleJoinServer);
+        _actionHandles.Add(NetworkMessageType.LeaveServer, HandleLeaveServer);
 
         StartServerAsync();
     }
@@ -52,61 +56,69 @@ public class Server : MonoBehaviour
         CloseServerUDP();
     }
 
+    #endregion
+
+
+    #region Network
     private void StartServerAsync()
     {
-        _server = new(8888);
-        _connected = true;
+        if(!_connected)
+        {
+            _server = new(_port);
+            _connected = true;
 
-        Debug.Log("Server Start!");
+            Debug.Log("Server Start!");
 
-        ListenForClientAsync();
+            ListenForClientAsync();
+        }
     }
-
+   
     async private void ListenForClientAsync()
     {
-        while (_connected)
+        if (_connected)
         {
             try
             {
                 // Receive result async
                 UdpReceiveResult result = await _server.ReceiveAsync();
 
+                // Start to listen immediatly
+                ListenForClientAsync();
+
                 // get message
                 NetworkMessage message = NetworkPackage.GetDataFromBytes(result.Buffer, result.Buffer.Length);
 
+                // Get sender ip
                 message.endPoint = result.RemoteEndPoint;
 
-                //Debug.Log($"Receive from {remoteEndPoint} | Message: {receivedMessage}");
-
                 _tasks.Enqueue(new(message, _actionHandles[message.type]));
-
-                // Convert the message to a byte array
-                //byte[] data = Encoding.ASCII.GetBytes("Hello" + remoteEndPoint);
-
-                // Send the data to the server
-                //_server?.Send(data, data.Length, remoteEndPoint);
             }
             catch (Exception ex)
             {
                 if (!_connected)
                 {
                     Debug.LogWarning("Server already closed!");
-                    break;
                 }
 
                 Debug.LogWarning($"Error: {ex.Message}");
 
-                _server?.Close();
-
-                _connected = false;
-
-                break;
+                CloseServerUDP();
             }
         }
     }
 
-    // Update is called once per frame
+    public async void SendMessageToClient(NetworkMessage message)
+    {
+        Debug.Log($"Server: send messages [{message.type}] to client ({message.endPoint})");
 
+        NetworkPackage package = new(message.type, message.GetBytes());
+
+        byte[] data = package.GetBytes();
+
+        await _server.SendAsync(data, data.Length, message.endPoint);
+
+        Debug.Log($"Message send to {message.endPoint} sucessful");
+    }
 
     private void CloseServerUDP()
     {
@@ -120,40 +132,32 @@ public class Server : MonoBehaviour
             Debug.Log("Server close!");
         }
     }
+    #endregion
 
+    #region Utils
     private uint GetNextUID()
     {
         return ++_genUID;
     }
+    #endregion
 
-    public async void SendMessageToClient(User user, NetworkMessage message)
-    {
-        Debug.Log($"Server: send messages [{message.type}] to client ({user.userName})");
 
-        NetworkPackage package = new(message.type, message.GetBytes());
-
-        byte[] data = package.GetBytes();
-
-        await _server.SendAsync(data, data.Length, user.userEndPoint);
-
-        Debug.Log($"Message send to {user.userEndPoint} sucessful");
-    }
-
+    #region Message handlers
     private void HandleJoinServer(NetworkMessage data)
     {
         var message = data as JoinServer;
 
-        if (!_users.ContainsKey(message.ownerUid))
+        if (!_users.ContainsKey(message.ownerUID))
         {
             User user = new(message.name, message.endPoint, GetNextUID());
 
-            message.ownerUid = user.uid;
+            message.ownerUID = user.uid;
 
             _users.Add(user.uid, user);
 
-            Debug.Log($"User with endPoint {message.endPoint} join successfull");
-
             message.successful = true;
+            
+            Debug.Log($"User with endPoint {message.endPoint} join successfull");
         }
         else
         {
@@ -164,8 +168,33 @@ public class Server : MonoBehaviour
             Debug.LogWarning($"Server error : {message.errorCode}");
         }
 
-        SendMessageToClient(_users[message.ownerUid], message);
+        SendMessageToClient(message);
     }
+    
+    private void HandleLeaveServer(NetworkMessage data)
+    {
+        var message = data as LeaveServer;
+
+        if (_users.ContainsKey(message.ownerUID))
+        {
+            _users.Remove(message.ownerUID);
+
+            message.successful = true;
+
+            Debug.Log($"User with endPoint {message.endPoint} leave successfull");
+        }
+        else
+        {
+            message.successful = false;
+
+            message.errorCode = NetworkErrorCode.ClientAlreadyLeaveTheServer;
+
+            Debug.LogWarning($"Server error : {message.errorCode}");
+        }
+
+        SendMessageToClient(message);
+    }
+    #endregion
 
     // obsolete
     /*

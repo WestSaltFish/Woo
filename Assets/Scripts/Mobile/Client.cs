@@ -18,13 +18,16 @@ public class Client : MonoBehaviour
     [SerializeField, Disable] private string _serverIp = "127.0.0.1";
     [SerializeField] private int _serverPort = 8888;
     private IPEndPoint _serverEndPoint;
-    private UdpClient _client;
+    private UdpClient _client = null;
     private readonly ConcurrentQueue<MessageHandler> _tasks = new();
     private readonly Dictionary<NetworkMessageType, Action<NetworkMessage>> _actionHandles = new();
+
+    #region Unity evets
 
     private void Start()
     {
         _actionHandles.Add(NetworkMessageType.JoinServer, HandleJoinServer);
+        _actionHandles.Add(NetworkMessageType.LeaveServer, HandleLeaveServer);
     }
 
     private void Update()
@@ -38,7 +41,11 @@ public class Client : MonoBehaviour
         // Send message to server
         if (Input.GetKeyDown(KeyCode.S))
         {
-            ConnecteToServer();
+            RequestConnectToServer();
+        }
+        else if(Input.GetKeyDown(KeyCode.D))
+        {
+            RequestLeaveFromServer();
         }
     }
 
@@ -47,50 +54,21 @@ public class Client : MonoBehaviour
         CloseClientUDP();
     }
 
-    public void SetServerPort(int port)
-    {
-        _serverPort = port;
-    }
+    #endregion
 
-    private async void ConnecteToServer()
-    {
-        // Get Server Port
-        _serverEndPoint = new IPEndPoint(IPAddress.Parse(_serverIp), _serverPort);
-
-        // Init client udp
-        _client = new();
-
-        try
-        {
-            _client.Connect(_serverEndPoint);
-
-            byte[] data = NetworkMessageFactory.JoinServerMessage("Chen").GetBytes();
-
-            int bytesSent = await _client.SendAsync(data, data.Length);
-
-            Debug.Log($"Sent {bytesSent} bytes to {_serverEndPoint}.");
-        }
-        catch (Exception ex)
-        {
-            Debug.LogWarning($"Connecting error : {ex.Message}.");
-
-            return;
-        }
-
-        // temporal
-        _connected = true;
-
-        ReceiveMessagesAsync();
-    }
-
+    #region Network
+    // Receivr message from server
     async private void ReceiveMessagesAsync()
     {
-        while (_connected)
+        if (_connected)
         {
             try
             {
                 // Receive result async
                 UdpReceiveResult result = await _client.ReceiveAsync();
+
+                // Start to listen message immediatly
+                ReceiveMessagesAsync();
 
                 // get message
                 NetworkMessage message = NetworkPackage.GetDataFromBytes(result.Buffer, result.Buffer.Length);
@@ -106,12 +84,18 @@ public class Client : MonoBehaviour
                 else
                 {
                     Debug.LogWarning($"Error receiving data: {ex.Message}.");
+
+                    CloseClientUDP();
                 }
-                break;
             }
         }
     }
 
+    public void SetServerPort(int port)
+    {
+        _serverPort = port;
+    }
+ 
     private void CloseClientUDP()
     {
         _connected = false;
@@ -123,19 +107,102 @@ public class Client : MonoBehaviour
             Debug.Log("Client close!");
         }
     }
+    #endregion
 
+
+    #region Requests
+    private async void RequestConnectToServer()
+    {
+        if(_client == null)
+        {
+            // Get Server Port
+            _serverEndPoint = new IPEndPoint(IPAddress.Parse(_serverIp), _serverPort);
+
+            // Init client udp
+            _client = new();
+
+            try
+            {
+                _client.Connect(_serverEndPoint);
+
+                byte[] data = NetworkMessageFactory.JoinServerMessage(uid, _name).GetBytes();
+
+                int bytesSent = await _client.SendAsync(data, data.Length);
+
+                Debug.Log($"Sent {bytesSent} bytes to server {_serverEndPoint}.");
+            }
+            catch (Exception ex)
+            {
+                Debug.LogWarning($"Connecting error : {ex.Message}.");
+
+                CloseClientUDP();
+
+                return;
+            }
+
+            // temporal
+            _connected = true;
+
+            ReceiveMessagesAsync();
+        }
+    }
+
+    private async void RequestLeaveFromServer()
+    {
+        if (_client != null)
+        {
+            try
+            {
+                byte[] data = NetworkMessageFactory.LeaveServertMessage(uid).GetBytes();
+
+                int bytesSent = await _client.SendAsync(data, data.Length);
+
+                Debug.Log($"Sent {bytesSent} bytes to server {_serverEndPoint}.");
+            }
+            catch (Exception ex)
+            {
+                Debug.LogWarning($"Connecting error : {ex.Message}.");
+
+                return;
+            }
+        }
+    }
+    #endregion
+
+
+    #region Message handlers
     private void HandleJoinServer(NetworkMessage data)
     {
         var message = data as JoinServer;
 
         if (message.successful)
         {
-            uid = message.ownerUid;
-            Debug.Log("Join server succesful");
+            uid = message.ownerUID;
+            Debug.Log("Join server successful");
         }
         else
         {
             Debug.Log($"User error: {message.errorCode}");
         }
     }
+
+    private void HandleLeaveServer(NetworkMessage data)
+    {
+        var message = data as LeaveServer;
+
+        if(message.successful || message.errorCode == NetworkErrorCode.ClientAlreadyLeaveTheServer || _client == null)
+        {
+            uid = 0;
+            CloseClientUDP();
+            Debug.Log("Leave server successful");
+        }
+        else
+        {
+            RequestLeaveFromServer();
+
+            Debug.Log($"User error: {message.errorCode}");
+        }
+    }
+
+    #endregion
 }

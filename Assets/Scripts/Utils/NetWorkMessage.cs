@@ -18,7 +18,8 @@ public enum NetworkMessageType
 public enum NetworkErrorCode
 {
     None,
-    ClientAlreadyInTheServer
+    ClientAlreadyInTheServer,
+    ClientAlreadyLeaveTheServer,
 }
 
 [Serializable]
@@ -67,7 +68,7 @@ public class NetworkMessage
     protected NetworkMessage(NetworkMessageType type, uint ownerUid)
     {
         this.type = type;
-        this.ownerUid = ownerUid;
+        this.ownerUID = ownerUid;
     }
 
     virtual public byte[] GetBytes()
@@ -78,7 +79,7 @@ public class NetworkMessage
     // 4 server & client
     public NetworkMessageType type = NetworkMessageType.None;
 
-    public uint ownerUid = 0;
+    public uint ownerUID = 0;
 
     public IPEndPoint endPoint = null;
 
@@ -90,9 +91,9 @@ public class NetworkMessage
 
 public class NetworkMessageFactory
 {
-    static public NetworkPackage JoinServerMessage(string userName)
+    static public NetworkPackage JoinServerMessage(uint uid, string userName)
     {
-        JoinServer msg = new(userName);
+        JoinServer msg = new(uid, userName);
 
         return new NetworkPackage(NetworkMessageType.JoinServer, msg.GetBytes());
     }
@@ -135,8 +136,9 @@ public class HearthBeat : NetworkMessage
 [Serializable]
 public class JoinServer : NetworkMessage
 {
-    public JoinServer(string userName) : base(NetworkMessageType.JoinServer, 0)
+    public JoinServer(uint uid, string userName) : base(NetworkMessageType.JoinServer, 0)
     {
+        ownerUID = uid;
         name = userName;
     }
 
