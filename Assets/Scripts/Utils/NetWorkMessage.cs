@@ -12,6 +12,7 @@ public enum NetworkMessageType
     Heartbeat,
     CloseServer,
     Message,
+    MobileRotation,
     MaxCount,
 }
 
@@ -56,10 +57,16 @@ public class NetworkPackage
 
     private static readonly Dictionary<NetworkMessageType, Func<byte[],NetworkMessage>> _getDataActions = new()
     {
-        { NetworkMessageType.Heartbeat, HearthBeat.GetData },
-        { NetworkMessageType.JoinServer, JoinServer.GetData },
-        { NetworkMessageType.LeaveServer, LeaveServer.GetData },
+        { NetworkMessageType.Heartbeat, GetData<HearthBeat> },
+        { NetworkMessageType.JoinServer, GetData<JoinServer> },
+        { NetworkMessageType.LeaveServer, GetData<LeaveServer> },
+        { NetworkMessageType.MobileRotation, GetData<MobileRotation> },
     };
+
+    static public T GetData<T>(byte[] data)
+    {
+        return JsonUtility.FromJson<T>(Encoding.ASCII.GetString(data, 0, data.Length));
+    }
 }
 
 [Serializable]
@@ -111,6 +118,13 @@ public class NetworkMessageFactory
 
         return new NetworkPackage(NetworkMessageType.LeaveServer, msg.GetBytes());
     }
+
+    static public NetworkPackage MobileRotationMessage(uint uid, Vector3 rotation)
+    {
+        MobileRotation msg = new(uid, rotation);
+
+        return new NetworkPackage(NetworkMessageType.MobileRotation, msg.GetBytes());
+    }
 }
 
 // -----------------------------------------------
@@ -121,16 +135,6 @@ public class NetworkMessageFactory
 public class HearthBeat : NetworkMessage
 {
     public HearthBeat(uint userId) : base(NetworkMessageType.Heartbeat, userId) { }
-
-    public override byte[] GetBytes()
-    {
-        return Encoding.ASCII.GetBytes(JsonUtility.ToJson(this));
-    }
-
-    static public HearthBeat GetData(byte[] data)
-    {
-        return JsonUtility.FromJson<HearthBeat>(Encoding.ASCII.GetString(data, 0, data.Length));
-    }
 }
 
 [Serializable]
@@ -140,11 +144,6 @@ public class JoinServer : NetworkMessage
     {
         ownerUID = uid;
         name = userName;
-    }
-
-    static public JoinServer GetData(byte[] data)
-    {
-        return JsonUtility.FromJson<JoinServer>(Encoding.ASCII.GetString(data, 0, data.Length));
     }
 
     // 4 server
@@ -158,11 +157,6 @@ public class LeaveServer : NetworkMessage
     {
         successful = forceLeave;
     }
-
-    static public LeaveServer GetData(byte[] data)
-    {
-        return JsonUtility.FromJson<LeaveServer>(Encoding.ASCII.GetString(data, 0, data.Length));
-    }
 }
 
 [Serializable]
@@ -173,11 +167,17 @@ public class Message : NetworkMessage
         this.message = message;
     }
 
-    static public LeaveServer GetData(byte[] data)
+    // 4 server
+    public string message;
+}
+
+public class MobileRotation : NetworkMessage
+{
+    public MobileRotation(uint userId, Vector3 rotation) : base(NetworkMessageType.Message, userId)
     {
-        return JsonUtility.FromJson<LeaveServer>(Encoding.ASCII.GetString(data, 0, data.Length));
+        this.rotation = rotation;
     }
 
     // 4 server
-    public string message;
+    public Vector3 rotation;
 }

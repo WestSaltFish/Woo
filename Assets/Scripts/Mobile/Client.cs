@@ -4,6 +4,7 @@ using System.Collections.Generic;
 using System.Net;
 using System.Net.Sockets;
 using UnityEngine;
+using TMPro;
 
 public class Client : MonoBehaviour
 {
@@ -15,12 +16,15 @@ public class Client : MonoBehaviour
     // Network params
     [Header("Network params")]
     [SerializeField, Disable] private bool _connected = false;
-    [SerializeField, Disable] private string _serverIp = "127.0.0.1";
+    [SerializeField, Disable] private string _serverIp = "169.254.72.24";
     [SerializeField] private int _serverPort = 8888;
     private IPEndPoint _serverEndPoint;
     private UdpClient _client = null;
     private readonly ConcurrentQueue<MessageHandler> _tasks = new();
     private readonly Dictionary<NetworkMessageType, Action<NetworkMessage>> _actionHandles = new();
+
+
+    public TMP_Text _debugText;
 
     #region Unity evets
 
@@ -111,7 +115,7 @@ public class Client : MonoBehaviour
 
 
     #region Requests
-    private async void RequestConnectToServer()
+    public async void RequestConnectToServer()
     {
         if(_client == null)
         {
@@ -134,6 +138,7 @@ public class Client : MonoBehaviour
             catch (Exception ex)
             {
                 Debug.LogWarning($"Connecting error : {ex.Message}.");
+                _debugText.text = $"Connecting error : {ex.Message}.";
 
                 CloseClientUDP();
 
@@ -167,6 +172,27 @@ public class Client : MonoBehaviour
             }
         }
     }
+
+    private async void RequestSendRotation()
+    {
+        if (_client != null)
+        {
+            try
+            {
+                byte[] data = NetworkMessageFactory.LeaveServertMessage(uid).GetBytes();
+
+                int bytesSent = await _client.SendAsync(data, data.Length);
+
+                Debug.Log($"Sent {bytesSent} bytes to server {_serverEndPoint}.");
+            }
+            catch (Exception ex)
+            {
+                Debug.LogWarning($"Connecting error : {ex.Message}.");
+
+                return;
+            }
+        }
+    }
     #endregion
 
 
@@ -179,10 +205,12 @@ public class Client : MonoBehaviour
         {
             uid = message.ownerUID;
             Debug.Log("Join server successful");
+            _debugText.text = "Join server successful";
         }
         else
         {
             Debug.Log($"User error: {message.errorCode}");
+            _debugText.text = $"User error: {message.errorCode}";
         }
     }
 

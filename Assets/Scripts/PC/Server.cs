@@ -2,8 +2,10 @@ using System;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Net;
+using System.Net.NetworkInformation;
 using System.Net.Sockets;
 using UnityEngine;
+using TMPro;
 
 public class Server : MonoBehaviour
 {
@@ -25,6 +27,8 @@ public class Server : MonoBehaviour
     private uint _genUID = 0;
 
 
+    public TMP_Text debugText;
+
     #region Unity events
     public void Awake()
     {
@@ -40,6 +44,8 @@ public class Server : MonoBehaviour
         _actionHandles.Add(NetworkMessageType.LeaveServer, HandleLeaveServer);
 
         StartServerAsync();
+
+        debugText.text = GetLocalIPAddress();
     }
 
     void Update()
@@ -195,6 +201,42 @@ public class Server : MonoBehaviour
         SendMessageToClient(message);
     }
     #endregion
+
+
+    public static string GetLocalIPAddress()
+    {
+        string localIP = string.Empty;
+
+        // 获取所有网络接口
+        NetworkInterface[] networkInterfaces = NetworkInterface.GetAllNetworkInterfaces();
+
+        foreach (NetworkInterface networkInterface in networkInterfaces)
+        {
+            // 过滤掉虚拟和回环接口
+            if (networkInterface.NetworkInterfaceType == NetworkInterfaceType.Ethernet ||
+                networkInterface.NetworkInterfaceType == NetworkInterfaceType.Wireless80211)
+            {
+                // 获取网络接口的 IP 属性
+                IPInterfaceProperties ipProperties = networkInterface.GetIPProperties();
+
+                foreach (UnicastIPAddressInformation ipAddressInfo in ipProperties.UnicastAddresses)
+                {
+                    // 过滤 IPv6 地址和回环地址
+                    if (ipAddressInfo.Address.AddressFamily == AddressFamily.InterNetwork &&
+                        !IPAddress.IsLoopback(ipAddressInfo.Address))
+                    {
+                        localIP = ipAddressInfo.Address.ToString();
+                        break;
+                    }
+                }
+
+                if (!string.IsNullOrEmpty(localIP))
+                    break;
+            }
+        }
+
+        return localIP;
+    }
 
     // obsolete
     /*
