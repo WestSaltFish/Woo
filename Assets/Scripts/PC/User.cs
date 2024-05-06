@@ -3,10 +3,10 @@ using System.Numerics;
 
 public struct UserSensorData
 {
-    public Vector3 Velocity { get; set; }
-    public Vector3 Acceleration { get; set; }
-    public Vector3 Rotation { get; set; }
-    public Vector3 Gravity { get; set; }
+    public UnityEngine.Vector3 Velocity { get; set; }
+    public UnityEngine.Vector3 Acceleration { get; set; }
+    public UnityEngine.Vector3 Rotation { get; set; }
+    public UnityEngine.Vector3 Gravity { get; set; }
 }
 
 public class User

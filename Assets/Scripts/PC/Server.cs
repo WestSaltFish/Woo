@@ -24,6 +24,8 @@ public class Server : MonoBehaviour
     private readonly ConcurrentQueue<MessageHandler> _tasks = new();
     private readonly Dictionary<NetworkMessageType, Action<NetworkMessage>> _actionHandles = new();
 
+    public Action<MobileSensorData> onUpdateSensorData;
+
     // to generate user uid
     private uint _genUID = 0;
 
@@ -42,8 +44,8 @@ public class Server : MonoBehaviour
     {
         _actionHandles.Add(NetworkMessageType.JoinServer, HandleJoinServer);
         _actionHandles.Add(NetworkMessageType.LeaveServer, HandleLeaveServer);
-        _actionHandles.Add(NetworkMessageType.MobileSensorEnable, HandleLeaveServer);
-        _actionHandles.Add(NetworkMessageType.MobileSensorData, HandleLeaveServer);
+        _actionHandles.Add(NetworkMessageType.MobileSensorEnable, HandleSensorEnable);
+        _actionHandles.Add(NetworkMessageType.MobileSensorData, HandleSensorData);
 
         StartServerAsync();
 
@@ -58,7 +60,8 @@ public class Server : MonoBehaviour
                 task.Execute();
         }
 
-        if (Input.GetKeyDown(KeyCode.D))
+        // Debug code
+        if (Input.GetKeyDown(KeyCode.A))
             RequestEnableSensor();
     }
 
@@ -72,7 +75,7 @@ public class Server : MonoBehaviour
     #region Network
     private void StartServerAsync()
     {
-        if(!_connected)
+        if (!_connected)
         {
             _server = new(_port);
             _connected = true;
@@ -82,7 +85,7 @@ public class Server : MonoBehaviour
             ListenForClientAsync();
         }
     }
-   
+
     async private void ListenForClientAsync()
     {
         if (_connected)
@@ -146,7 +149,7 @@ public class Server : MonoBehaviour
         foreach (var user in _users)
         {
             SendMessageToClient(data, user.Value.userEndPoint);
-        } 
+        }
     }
 
     private void CloseServerUDP()
@@ -179,107 +182,6 @@ public class Server : MonoBehaviour
     {
         return ++_genUID;
     }
-    #endregion
-
-    #region Message handlers
-    private void HandleJoinServer(NetworkMessage data)
-    {
-        var msg = data as JoinServer;
-
-        if (!_users.ContainsKey(msg.ownerUID))
-        {
-            User user = new(msg.name, msg.endPoint, GetNextUID());
-
-            msg.ownerUID = user.uid;
-
-            _users.Add(user.uid, user);
-
-            msg.successful = true;
-            
-            Debug.Log($"User with endPoint {msg.endPoint} join successfull");
-        }
-        else
-        {
-            msg.successful = false;
-
-            msg.errorCode = NetworkErrorCode.ClientAlreadyInTheServer;
-
-            Debug.LogWarning($"Server error : {msg.errorCode}");
-        }
-
-        SendMessageToClient(msg);
-    }
-    
-    private void HandleLeaveServer(NetworkMessage data)
-    {
-        var msg = data as LeaveServer;
-
-        if (_users.ContainsKey(msg.ownerUID))
-        {
-            _users.Remove(msg.ownerUID);
-
-            msg.successful = true;
-
-            Debug.Log($"User with endPoint {msg.endPoint} leave successfull");
-        }
-        else
-        {
-            msg.successful = false;
-
-            msg.errorCode = NetworkErrorCode.ClientAlreadyLeaveTheServer;
-
-            Debug.LogWarning($"Server error : {msg.errorCode}");
-        }
-
-        SendMessageToClient(msg);
-    }
-
-    private void HandleSensorEnable(NetworkMessage data)
-    {
-        
-    }
-
-    private void HandleSensorData(NetworkMessage data)
-    {
-        var msg = data as MobileSensorData;
-
-        if (!_users.ContainsKey(msg.ownerUID))
-        {
-            Debug.Log($"User with endPoint {msg.endPoint} is not exist in the server");
-
-            msg.successful = false;
-        }
-        else
-        {
-            var user = _users[msg.ownerUID];
-
-            // TOFIX check how many flag is by set for update
-
-            if((_sensorEnable & MobileSensorFlag.Velocity) != 0)
-            {
-
-            }
-            if ((_sensorEnable & MobileSensorFlag.Acceleration) != 0)
-            {
-
-            }
-            if ((_sensorEnable & MobileSensorFlag.Rotation) != 0)
-            {
-
-            }
-            if ((_sensorEnable & MobileSensorFlag.Gravity) != 0)
-            {
-
-            }
-
-            Debug.Log($"User with endPoint {msg.endPoint} has updated her sensor data");
-
-            msg.successful = true;
-        }
-
-        SendMessageToClient(msg);
-    }
-    #endregion
 
     public string GetLocalIPAddress()
     {
@@ -315,6 +217,119 @@ public class Server : MonoBehaviour
 
         return localIP;
     }
+    #endregion
+
+    #region Message handlers
+    private void HandleJoinServer(NetworkMessage data)
+    {
+        var msg = data as JoinServer;
+
+        if (!_users.ContainsKey(msg.ownerUID))
+        {
+            User user = new(msg.name, msg.endPoint, GetNextUID());
+
+            msg.ownerUID = user.uid;
+
+            _users.Add(user.uid, user);
+
+            msg.successful = true;
+
+            Debug.Log($"User with endPoint {msg.endPoint} join successfull");
+        }
+        else
+        {
+            msg.successful = false;
+
+            msg.errorCode = NetworkErrorCode.ClientAlreadyInTheServer;
+
+            Debug.LogWarning($"Server error : {msg.errorCode}");
+        }
+
+        SendMessageToClient(msg);
+    }
+
+    private void HandleLeaveServer(NetworkMessage data)
+    {
+        var msg = data as LeaveServer;
+
+        if (_users.ContainsKey(msg.ownerUID))
+        {
+            _users.Remove(msg.ownerUID);
+
+            msg.successful = true;
+
+            Debug.Log($"User with endPoint {msg.endPoint} leave successfull");
+        }
+        else
+        {
+            msg.successful = false;
+
+            msg.errorCode = NetworkErrorCode.ClientAlreadyLeaveTheServer;
+
+            Debug.LogWarning($"Server error : {msg.errorCode}");
+        }
+
+        SendMessageToClient(msg);
+    }
+
+    private void HandleSensorEnable(NetworkMessage data)
+    {
+        // Nothing for now
+    }
+
+    private void HandleSensorData(NetworkMessage data)
+    {
+        var msg = data as MobileSensorData;
+
+        onUpdateSensorData?.Invoke(msg);
+
+        if (!_users.ContainsKey(msg.ownerUID))
+        {
+            Debug.Log($"User with endPoint {msg.endPoint} is not exist in the server");
+
+            msg.successful = false;
+        }
+        else
+        {
+            var user = _users[msg.ownerUID];
+
+            msg.successful = true;
+
+            // Only update necesarry data
+            try
+            {
+                if ((_sensorEnable & MobileSensorFlag.Velocity) != 0)
+                {
+                    user.senserData.Velocity = msg.mobileSensorData[MobileSensorFlag.Velocity];
+                }
+                if ((_sensorEnable & MobileSensorFlag.Acceleration) != 0)
+                {
+                    user.senserData.Acceleration = msg.mobileSensorData[MobileSensorFlag.Acceleration];
+                }
+                if ((_sensorEnable & MobileSensorFlag.Rotation) != 0)
+                {
+                    user.senserData.Rotation = msg.mobileSensorData[MobileSensorFlag.Rotation];
+                }
+                if ((_sensorEnable & MobileSensorFlag.Gravity) != 0)
+                {
+                    user.senserData.Gravity = msg.mobileSensorData[MobileSensorFlag.Gravity];
+                }
+            }
+            catch (Exception ex)
+            {
+                msg.successful = false;
+
+                Debug.Log($"Update date error: {ex}");
+            }
+
+
+            if (msg.successful)
+                Debug.Log($"User with endPoint {msg.endPoint} has updated her sensor data");
+        }
+
+        //SendMessageToClient(msg);
+    }
+    #endregion
 
     // obsolete
     /*

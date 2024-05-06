@@ -6,6 +6,7 @@ using System.Net.Sockets;
 using UnityEngine;
 using TMPro;
 
+ [RequireComponent(typeof(MobileSensor))]
 public class Client : MonoBehaviour
 {
     // User info
@@ -22,7 +23,9 @@ public class Client : MonoBehaviour
     private UdpClient _client = null;
     private readonly ConcurrentQueue<MessageHandler> _tasks = new();
     private readonly Dictionary<NetworkMessageType, Action<NetworkMessage>> _actionHandles = new();
-    private MobileSensorFlag _sensorFlag = MobileSensorFlag.None;
+    [SerializeField, Disable] private MobileSensorFlag _sensorFlag = MobileSensorFlag.None;
+    private Dictionary<MobileSensorFlag, Vector3> _sensorValues = new();
+    private MobileSensor _mobileSensor;
 
     public TMP_Text _debugText;
 
@@ -30,10 +33,12 @@ public class Client : MonoBehaviour
 
     private void Start()
     {
+        _mobileSensor = GetComponent<MobileSensor>();
+
         _actionHandles.Add(NetworkMessageType.JoinServer, HandleJoinServer);
         _actionHandles.Add(NetworkMessageType.LeaveServer, HandleLeaveServer);
-        _actionHandles.Add(NetworkMessageType.MobileSensorEnable, HandleLeaveServer);
-        _actionHandles.Add(NetworkMessageType.MobileSensorData, HandleLeaveServer);
+        _actionHandles.Add(NetworkMessageType.MobileSensorEnable, HandleSensorEnable);
+        _actionHandles.Add(NetworkMessageType.MobileSensorData, HandleSensorData);
     }
 
     private void Update()
@@ -53,6 +58,8 @@ public class Client : MonoBehaviour
         {
             RequestLeaveFromServer();
         }
+
+        RequestSendSensorData(); 
     }
 
     private void OnDestroy()
@@ -176,11 +183,28 @@ public class Client : MonoBehaviour
 
     private async void RequestSendSensorData()
     {
-        if (_client != null)
+        if (_client != null && _sensorFlag != MobileSensorFlag.None) 
         {
             try
             {
-                byte[] data = NetworkMessageFactory.LeaveServertMessage(uid).GetBytes();
+                if ((_sensorFlag & MobileSensorFlag.Velocity) != 0)
+                {
+                    _sensorValues[MobileSensorFlag.Velocity] = _mobileSensor.Velocity;
+                }
+                if ((_sensorFlag & MobileSensorFlag.Acceleration) != 0)
+                {
+                    _sensorValues[MobileSensorFlag.Acceleration] = _mobileSensor.Acceleration;
+                }
+                if ((_sensorFlag & MobileSensorFlag.Rotation) != 0)
+                {
+                    _sensorValues[MobileSensorFlag.Rotation] = _mobileSensor.Rotation;
+                }
+                if ((_sensorFlag & MobileSensorFlag.Gravity) != 0)
+                {
+                    _sensorValues[MobileSensorFlag.Gravity] = _mobileSensor.Gravity;
+                }
+
+                byte[] data = NetworkMessageFactory.MobileSensorDataMessage(uid, _sensorValues).GetBytes();
 
                 int bytesSent = await _client.SendAsync(data, data.Length);
 
@@ -206,12 +230,16 @@ public class Client : MonoBehaviour
         {
             uid = message.ownerUID;
             Debug.Log("Join server successful");
-            _debugText.text = "Join server successful";
+
+            if (_debugText != null) 
+                _debugText.text = "Join server successful";
         }
         else
         {
             Debug.Log($"User error: {message.errorCode}");
-            _debugText.text = $"User error: {message.errorCode}";
+
+            if (_debugText != null)
+                _debugText.text = $"User error: {message.errorCode}";
         }
     }
 
@@ -238,6 +266,25 @@ public class Client : MonoBehaviour
         var message = data as MobileSensorEnable;
 
         _sensorFlag = message.enableFlag;
+
+        _sensorValues.Clear();
+
+        if ((_sensorFlag & MobileSensorFlag.Velocity) != 0)
+        {
+            _sensorValues.Add(MobileSensorFlag.Velocity, _mobileSensor.Velocity);
+        }
+        if ((_sensorFlag & MobileSensorFlag.Acceleration) != 0)
+        {
+            _sensorValues.Add(MobileSensorFlag.Acceleration, _mobileSensor.Acceleration);
+        }
+        if ((_sensorFlag & MobileSensorFlag.Rotation) != 0)
+        {
+            _sensorValues.Add(MobileSensorFlag.Rotation, _mobileSensor.Rotation);
+        }
+        if ((_sensorFlag & MobileSensorFlag.Gravity) != 0)
+        {
+            _sensorValues.Add(MobileSensorFlag.Gravity, _mobileSensor.Gravity);
+        }
     }
 
     private void HandleSensorData(NetworkMessage data)

@@ -17,35 +17,41 @@ public class MobileSensor : MonoBehaviour
 {
     public TMP_Text debugMeesage;
 
-    private Vector3 currentVelocity;
-    private Vector3 currentAcceleration;
-    private Vector3 currentGravity;
-    private Vector3 currentRotation;
+    public Vector3 Velocity { get => _currentVelocity; }
+    public Vector3 Acceleration { get => _currentAcceleration; }
+    public Vector3 Gravity { get => _currentGravity; }
+    public Vector3 Rotation { get => _currentRotation; }
+
+
+    private Vector3 _currentVelocity;
+    private Vector3 _currentAcceleration;
+    private Vector3 _currentGravity;
+    private Vector3 _currentRotation;
 
     // Start is called before the first frame update
     void Start()
     {
         Input.gyro.enabled = true;
 
-        currentAcceleration = Vector3.zero;
+        _currentAcceleration = Vector3.zero;
     }
 
     // Update is called once per frame
     void Update()
     {
-        currentGravity = GetGravity();
+        _currentGravity = GetGravity();
 
         UpdateAcceleration();
 
         UpdateVelocity();
 
-        currentRotation = Input.gyro.attitude.eulerAngles;
+        _currentRotation = Input.gyro.attitude.eulerAngles;
 
-        debugMeesage.text = $"Acc: {currentAcceleration} " +
-            $"\n\nAccMag: {currentAcceleration.magnitude}" +
-            $"\n\nVelocity: {currentVelocity}" +
-            $"\n\nGyrocopy: {currentRotation}" +
-            $"\n\nGravity: {-currentGravity}";
+        debugMeesage.text = $"Acc: {_currentAcceleration} " +
+            $"\n\nAccMag: {_currentAcceleration.magnitude}" +
+            $"\n\nVelocity: {_currentVelocity}" +
+            $"\n\nGyrocopy: {_currentRotation}" +
+            $"\n\nGravity: {-_currentGravity}";
     }
 
     private void UpdateAcceleration(bool withGravity = false)
@@ -66,15 +72,15 @@ public class MobileSensor : MonoBehaviour
         if (!withGravity)
             acc -= GetGravity();
 
-        currentAcceleration = Vector3.Lerp(currentAcceleration, acc, 0.5f);
+        _currentAcceleration = Vector3.Lerp(_currentAcceleration, acc, 0.5f);
     }
 
     private void UpdateVelocity()
     {
-        currentVelocity += currentAcceleration * Time.deltaTime;
+        _currentVelocity += _currentAcceleration * Time.deltaTime;
 
-        if (currentAcceleration.magnitude < 0.01f)
-            currentVelocity = Vector3.zero;
+        if (_currentAcceleration.magnitude < 0.01f)
+            _currentVelocity = Vector3.zero;
     }
 
     private Vector3 GetGravity()
