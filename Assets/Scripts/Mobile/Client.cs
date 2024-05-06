@@ -22,7 +22,7 @@ public class Client : MonoBehaviour
     private UdpClient _client = null;
     private readonly ConcurrentQueue<MessageHandler> _tasks = new();
     private readonly Dictionary<NetworkMessageType, Action<NetworkMessage>> _actionHandles = new();
-
+    private MobileSensorFlag _sensorFlag = MobileSensorFlag.None;
 
     public TMP_Text _debugText;
 
@@ -32,6 +32,8 @@ public class Client : MonoBehaviour
     {
         _actionHandles.Add(NetworkMessageType.JoinServer, HandleJoinServer);
         _actionHandles.Add(NetworkMessageType.LeaveServer, HandleLeaveServer);
+        _actionHandles.Add(NetworkMessageType.MobileSensorEnable, HandleLeaveServer);
+        _actionHandles.Add(NetworkMessageType.MobileSensorData, HandleLeaveServer);
     }
 
     private void Update()
@@ -113,7 +115,6 @@ public class Client : MonoBehaviour
     }
     #endregion
 
-
     #region Requests
     public async void RequestConnectToServer()
     {
@@ -173,7 +174,7 @@ public class Client : MonoBehaviour
         }
     }
 
-    private async void RequestSendRotation()
+    private async void RequestSendSensorData()
     {
         if (_client != null)
         {
@@ -193,8 +194,8 @@ public class Client : MonoBehaviour
             }
         }
     }
-    #endregion
 
+    #endregion
 
     #region Message handlers
     private void HandleJoinServer(NetworkMessage data)
@@ -229,6 +230,21 @@ public class Client : MonoBehaviour
             RequestLeaveFromServer();
 
             Debug.Log($"User error: {message.errorCode}");
+        }
+    }
+
+    private void HandleSensorEnable(NetworkMessage data)
+    {
+        var message = data as MobileSensorEnable;
+
+        _sensorFlag = message.enableFlag;
+    }
+
+    private void HandleSensorData(NetworkMessage data)
+    {
+        if (data.successful)
+        {
+            Debug.Log("Sensor data send to server successful");
         }
     }
 

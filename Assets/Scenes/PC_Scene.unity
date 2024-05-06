@@ -169,6 +169,7 @@ MonoBehaviour:
   m_EditorClassIdentifier: 
   _port: 8888
   _connected: 0
+  _sensorEnable: 0
   debugText: {fileID: 753567038}
 --- !u!1 &705507993
 GameObject:
@@ -627,6 +628,7 @@ MonoBehaviour:
   _connected: 0
   _serverIp: 127.0.0.1
   _serverPort: 8888
+  _debugText: {fileID: 0}
 --- !u!4 &976659936
 Transform:
   m_ObjectHideFlags: 0

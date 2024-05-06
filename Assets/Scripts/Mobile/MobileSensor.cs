@@ -1,5 +1,17 @@
 using UnityEngine;
 using TMPro;
+using System;
+
+// https://stackoverflow.com/questions/8447/what-does-the-flags-enum-attribute-mean-in-c
+[Flags]
+public enum MobileSensorFlag
+{
+    None = 0,               // 00000000
+    Velocity = 1 << 0,      // 00000001
+    Acceleration = 1 << 1,  // 00000010
+    Gravity = 1 << 2,       // 00000100
+    Rotation = 1 << 3       // 00001000
+}
 
 public class MobileSensor : MonoBehaviour
 {

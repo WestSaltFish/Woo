@@ -19,13 +19,13 @@ public class Server : MonoBehaviour
 
     // Server data
     [SerializeField, Disable] private bool _connected = false;
+    [SerializeField] private MobileSensorFlag _sensorEnable;
     private readonly Dictionary<uint, User> _users = new();
     private readonly ConcurrentQueue<MessageHandler> _tasks = new();
     private readonly Dictionary<NetworkMessageType, Action<NetworkMessage>> _actionHandles = new();
 
     // to generate user uid
     private uint _genUID = 0;
-
 
     public TMP_Text debugText;
 
@@ -42,6 +42,8 @@ public class Server : MonoBehaviour
     {
         _actionHandles.Add(NetworkMessageType.JoinServer, HandleJoinServer);
         _actionHandles.Add(NetworkMessageType.LeaveServer, HandleLeaveServer);
+        _actionHandles.Add(NetworkMessageType.MobileSensorEnable, HandleLeaveServer);
+        _actionHandles.Add(NetworkMessageType.MobileSensorData, HandleLeaveServer);
 
         StartServerAsync();
 
@@ -55,6 +57,9 @@ public class Server : MonoBehaviour
             if (_tasks.TryDequeue(out MessageHandler task))
                 task.Execute();
         }
+
+        if (Input.GetKeyDown(KeyCode.D))
+            RequestEnableSensor();
     }
 
     private void OnDestroy()
@@ -63,7 +68,6 @@ public class Server : MonoBehaviour
     }
 
     #endregion
-
 
     #region Network
     private void StartServerAsync()
@@ -126,6 +130,25 @@ public class Server : MonoBehaviour
         Debug.Log($"Message send to {message.endPoint} sucessful");
     }
 
+    private async void SendMessageToClient(byte[] data, IPEndPoint endPoint)
+    {
+        await _server.SendAsync(data, data.Length, endPoint);
+
+        Debug.Log($"Message send to {endPoint} sucessful");
+    }
+
+    public void SendMessageToClients(NetworkPackage package)
+    {
+        Debug.Log($"Server: send messages [{package.type}] to all client");
+
+        byte[] data = package.GetBytes();
+
+        foreach (var user in _users)
+        {
+            SendMessageToClient(data, user.Value.userEndPoint);
+        } 
+    }
+
     private void CloseServerUDP()
     {
         _connected = false;
@@ -140,6 +163,17 @@ public class Server : MonoBehaviour
     }
     #endregion
 
+    #region Requests
+
+    private void RequestEnableSensor()
+    {
+        var msg = NetworkMessageFactory.MobileSensorEnableMessage(_sensorEnable);
+
+        SendMessageToClients(msg);
+    }
+
+    #endregion
+
     #region Utils
     private uint GetNextUID()
     {
@@ -147,63 +181,107 @@ public class Server : MonoBehaviour
     }
     #endregion
 
-
     #region Message handlers
     private void HandleJoinServer(NetworkMessage data)
     {
-        var message = data as JoinServer;
+        var msg = data as JoinServer;
 
-        if (!_users.ContainsKey(message.ownerUID))
+        if (!_users.ContainsKey(msg.ownerUID))
         {
-            User user = new(message.name, message.endPoint, GetNextUID());
+            User user = new(msg.name, msg.endPoint, GetNextUID());
 
-            message.ownerUID = user.uid;
+            msg.ownerUID = user.uid;
 
             _users.Add(user.uid, user);
 
-            message.successful = true;
+            msg.successful = true;
             
-            Debug.Log($"User with endPoint {message.endPoint} join successfull");
+            Debug.Log($"User with endPoint {msg.endPoint} join successfull");
         }
         else
         {
-            message.successful = false;
+            msg.successful = false;
 
-            message.errorCode = NetworkErrorCode.ClientAlreadyInTheServer;
+            msg.errorCode = NetworkErrorCode.ClientAlreadyInTheServer;
 
-            Debug.LogWarning($"Server error : {message.errorCode}");
+            Debug.LogWarning($"Server error : {msg.errorCode}");
         }
 
-        SendMessageToClient(message);
+        SendMessageToClient(msg);
     }
     
     private void HandleLeaveServer(NetworkMessage data)
     {
-        var message = data as LeaveServer;
+        var msg = data as LeaveServer;
 
-        if (_users.ContainsKey(message.ownerUID))
+        if (_users.ContainsKey(msg.ownerUID))
         {
-            _users.Remove(message.ownerUID);
+            _users.Remove(msg.ownerUID);
 
-            message.successful = true;
+            msg.successful = true;
 
-            Debug.Log($"User with endPoint {message.endPoint} leave successfull");
+            Debug.Log($"User with endPoint {msg.endPoint} leave successfull");
         }
         else
         {
-            message.successful = false;
+            msg.successful = false;
 
-            message.errorCode = NetworkErrorCode.ClientAlreadyLeaveTheServer;
+            msg.errorCode = NetworkErrorCode.ClientAlreadyLeaveTheServer;
 
-            Debug.LogWarning($"Server error : {message.errorCode}");
+            Debug.LogWarning($"Server error : {msg.errorCode}");
         }
 
-        SendMessageToClient(message);
+        SendMessageToClient(msg);
+    }
+
+    private void HandleSensorEnable(NetworkMessage data)
+    {
+        
+    }
+
+    private void HandleSensorData(NetworkMessage data)
+    {
+        var msg = data as MobileSensorData;
+
+        if (!_users.ContainsKey(msg.ownerUID))
+        {
+            Debug.Log($"User with endPoint {msg.endPoint} is not exist in the server");
+
+            msg.successful = false;
+        }
+        else
+        {
+            var user = _users[msg.ownerUID];
+
+            // TOFIX check how many flag is by set for update
+
+            if((_sensorEnable & MobileSensorFlag.Velocity) != 0)
+            {
+
+            }
+            if ((_sensorEnable & MobileSensorFlag.Acceleration) != 0)
+            {
+
+            }
+            if ((_sensorEnable & MobileSensorFlag.Rotation) != 0)
+            {
+
+            }
+            if ((_sensorEnable & MobileSensorFlag.Gravity) != 0)
+            {
+
+            }
+
+            Debug.Log($"User with endPoint {msg.endPoint} has updated her sensor data");
+
+            msg.successful = true;
+        }
+
+        SendMessageToClient(msg);
     }
     #endregion
 
-
-    public static string GetLocalIPAddress()
+    public string GetLocalIPAddress()
     {
         string localIP = string.Empty;
 

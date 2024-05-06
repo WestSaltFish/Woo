@@ -12,7 +12,8 @@ public enum NetworkMessageType
     Heartbeat,
     CloseServer,
     Message,
-    MobileRotation,
+    MobileSensorEnable,
+    MobileSensorData,
     MaxCount,
 }
 
@@ -60,7 +61,8 @@ public class NetworkPackage
         { NetworkMessageType.Heartbeat, GetData<HearthBeat> },
         { NetworkMessageType.JoinServer, GetData<JoinServer> },
         { NetworkMessageType.LeaveServer, GetData<LeaveServer> },
-        { NetworkMessageType.MobileRotation, GetData<MobileRotation> },
+        { NetworkMessageType.MobileSensorEnable, GetData<MobileSensorEnable> },
+        { NetworkMessageType.MobileSensorData, GetData<MobileSensorData> },
     };
 
     static public T GetData<T>(byte[] data)
@@ -119,11 +121,19 @@ public class NetworkMessageFactory
         return new NetworkPackage(NetworkMessageType.LeaveServer, msg.GetBytes());
     }
 
-    static public NetworkPackage MobileRotationMessage(uint uid, Vector3 rotation)
+    static public NetworkPackage MobileSensorDataMessage(uint uid, Dictionary<MobileSensorFlag, Vector3> mobileSensordata)
     {
-        MobileRotation msg = new(uid, rotation);
+        MobileSensorData msg = new(uid, mobileSensordata);
 
-        return new NetworkPackage(NetworkMessageType.MobileRotation, msg.GetBytes());
+        return new NetworkPackage(NetworkMessageType.MobileSensorData, msg.GetBytes());
+    }
+
+    // Server request
+    static public NetworkPackage MobileSensorEnableMessage(MobileSensorFlag enableFlag)
+    {
+        MobileSensorEnable msg = new(enableFlag);
+
+        return new NetworkPackage(NetworkMessageType.MobileSensorEnable, msg.GetBytes());
     }
 }
 
@@ -171,13 +181,24 @@ public class Message : NetworkMessage
     public string message;
 }
 
-public class MobileRotation : NetworkMessage
+public class MobileSensorEnable : NetworkMessage
 {
-    public MobileRotation(uint userId, Vector3 rotation) : base(NetworkMessageType.Message, userId)
+    public MobileSensorEnable(MobileSensorFlag enableFlag) : base(NetworkMessageType.MobileSensorEnable, 0)
     {
-        this.rotation = rotation;
+        this.enableFlag = enableFlag;
     }
 
     // 4 server
-    public Vector3 rotation;
+    public MobileSensorFlag enableFlag;
+}
+
+public class MobileSensorData : NetworkMessage
+{
+    public MobileSensorData(uint userId, Dictionary<MobileSensorFlag, Vector3> mobileSensorData) : base(NetworkMessageType.MobileSensorData, userId)
+    {
+        this.mobileSensorData = mobileSensorData;
+    }
+
+    // 4 server
+    public Dictionary<MobileSensorFlag, Vector3> mobileSensorData;
 }
