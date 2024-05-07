@@ -5,8 +5,9 @@ using System.Net;
 using System.Net.Sockets;
 using UnityEngine;
 using TMPro;
+using System.Threading.Tasks;
 
- [RequireComponent(typeof(MobileSensor))]
+[RequireComponent(typeof(MobileSensor))]
 public class Client : MonoBehaviour
 {
     // User info
@@ -17,8 +18,9 @@ public class Client : MonoBehaviour
     // Network params
     [Header("Network params")]
     [SerializeField, Disable] private bool _connected = false;
-    [SerializeField, Disable] private string _serverIp = "169.254.72.24";
+    [SerializeField] private string _serverIp = "169.254.72.24";
     [SerializeField] private int _serverPort = 8888;
+    [SerializeField] private int _maxRetries = 3;
     private IPEndPoint _serverEndPoint;
     private UdpClient _client = null;
     private readonly ConcurrentQueue<MessageHandler> _tasks = new();
@@ -104,6 +106,48 @@ public class Client : MonoBehaviour
         }
     }
 
+    async private Task<bool> SendMessageToServer(NetworkPackage package)
+    {
+        byte[] data = package.GetBytes();
+        int retryCount = 0;
+
+        while (retryCount < _maxRetries)
+        {
+            try
+            {
+                int bytesSent = await _client.SendAsync(data, data.Length);
+
+                Debug.Log($"Sent {bytesSent} bytes to server {_serverEndPoint}.");
+
+                return true;
+            }
+            catch (SocketException ex) when (ex.SocketErrorCode == SocketError.TimedOut)
+            {
+                // time out 
+                Debug.LogWarning($"Connection timed out: {ex.Message}");
+                _debugText.text = $"Connection timed out: {ex.Message}";
+                retryCount++;
+            }
+            catch (Exception ex)
+            {
+                // Another error
+                Debug.LogWarning($"Connection error : {ex.Message}.");
+                _debugText.text = $"Connection error : {ex.Message}.";
+                CloseClientUDP();
+
+                return false;
+            }
+        }
+
+        Debug.LogWarning($"Client: Failed to send message after {_maxRetries} retries.");
+        
+        _debugText.text = $"Client: Failed to send message after {_maxRetries} retries.";
+        
+        CloseClientUDP();
+
+        return false;
+    }
+
     public void SetServerPort(int port)
     {
         _serverPort = port;
@@ -133,30 +177,16 @@ public class Client : MonoBehaviour
             // Init client udp
             _client = new();
 
-            try
+            _client.Connect(_serverEndPoint);
+
+            bool suc = await SendMessageToServer(NetworkMessageFactory.JoinServerMessage(uid, _name));
+
+            if(suc)
             {
-                _client.Connect(_serverEndPoint);
+                _connected = suc;
 
-                byte[] data = NetworkMessageFactory.JoinServerMessage(uid, _name).GetBytes();
-
-                int bytesSent = await _client.SendAsync(data, data.Length);
-
-                Debug.Log($"Sent {bytesSent} bytes to server {_serverEndPoint}.");
+                ReceiveMessagesAsync();
             }
-            catch (Exception ex)
-            {
-                Debug.LogWarning($"Connecting error : {ex.Message}.");
-                _debugText.text = $"Connecting error : {ex.Message}.";
-
-                CloseClientUDP();
-
-                return;
-            }
-
-            // temporal
-            _connected = true;
-
-            ReceiveMessagesAsync();
         }
     }
 
@@ -164,20 +194,7 @@ public class Client : MonoBehaviour
     {
         if (_client != null)
         {
-            try
-            {
-                byte[] data = NetworkMessageFactory.LeaveServertMessage(uid).GetBytes();
-
-                int bytesSent = await _client.SendAsync(data, data.Length);
-
-                Debug.Log($"Sent {bytesSent} bytes to server {_serverEndPoint}.");
-            }
-            catch (Exception ex)
-            {
-                Debug.LogWarning($"Connecting error : {ex.Message}.");
-
-                return;
-            }
+            bool suc = await SendMessageToServer(NetworkMessageFactory.LeaveServertMessage(uid));
         }
     }
 
@@ -185,37 +202,24 @@ public class Client : MonoBehaviour
     {
         if (_client != null && _sensorFlag != MobileSensorFlag.None) 
         {
-            try
+            if ((_sensorFlag & MobileSensorFlag.Velocity) != 0)
             {
-                if ((_sensorFlag & MobileSensorFlag.Velocity) != 0)
-                {
-                    _sensorValues[MobileSensorFlag.Velocity] = _mobileSensor.Velocity;
-                }
-                if ((_sensorFlag & MobileSensorFlag.Acceleration) != 0)
-                {
-                    _sensorValues[MobileSensorFlag.Acceleration] = _mobileSensor.Acceleration;
-                }
-                if ((_sensorFlag & MobileSensorFlag.Rotation) != 0)
-                {
-                    _sensorValues[MobileSensorFlag.Rotation] = _mobileSensor.Rotation;
-                }
-                if ((_sensorFlag & MobileSensorFlag.Gravity) != 0)
-                {
-                    _sensorValues[MobileSensorFlag.Gravity] = _mobileSensor.Gravity;
-                }
-
-                byte[] data = NetworkMessageFactory.MobileSensorDataMessage(uid, _sensorValues).GetBytes();
-
-                int bytesSent = await _client.SendAsync(data, data.Length);
-
-                Debug.Log($"Sent {bytesSent} bytes to server {_serverEndPoint}.");
+                _sensorValues[MobileSensorFlag.Velocity] = _mobileSensor.Velocity;
             }
-            catch (Exception ex)
+            if ((_sensorFlag & MobileSensorFlag.Acceleration) != 0)
             {
-                Debug.LogWarning($"Connecting error : {ex.Message}.");
-
-                return;
+                _sensorValues[MobileSensorFlag.Acceleration] = _mobileSensor.Acceleration;
             }
+            if ((_sensorFlag & MobileSensorFlag.Rotation) != 0)
+            {
+                _sensorValues[MobileSensorFlag.Rotation] = _mobileSensor.Rotation;
+            }
+            if ((_sensorFlag & MobileSensorFlag.Gravity) != 0)
+            {
+                _sensorValues[MobileSensorFlag.Gravity] = _mobileSensor.Gravity;
+            }
+
+            bool suc = await SendMessageToServer(NetworkMessageFactory.MobileSensorDataMessage(uid, _sensorValues));
         }
     }
 

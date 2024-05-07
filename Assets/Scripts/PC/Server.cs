@@ -6,6 +6,9 @@ using System.Net.NetworkInformation;
 using System.Net.Sockets;
 using UnityEngine;
 using TMPro;
+using UnityEditor.PackageManager;
+using UnityEditor.VersionControl;
+using System.Threading.Tasks;
 
 public class Server : MonoBehaviour
 {
@@ -13,12 +16,13 @@ public class Server : MonoBehaviour
     public static Server instance = null;
 
     // Server conection
+    [SerializeField, Disable] private bool _connected = false;
     [SerializeField] private int _port = 8888;
+    [SerializeField] private int _maxRetries = 3;
     private UdpClient _server;
     private readonly object _lock = new();
 
     // Server data
-    [SerializeField, Disable] private bool _connected = false;
     [SerializeField] private MobileSensorFlag _sensorEnable;
     private readonly Dictionary<uint, User> _users = new();
     private readonly ConcurrentQueue<MessageHandler> _tasks = new();
@@ -111,6 +115,8 @@ public class Server : MonoBehaviour
                 if (!_connected)
                 {
                     Debug.LogWarning("Server already closed!");
+
+                    return;
                 }
 
                 Debug.LogWarning($"Error: {ex.Message}");
@@ -118,26 +124,6 @@ public class Server : MonoBehaviour
                 CloseServerUDP();
             }
         }
-    }
-
-    public async void SendMessageToClient(NetworkMessage message)
-    {
-        Debug.Log($"Server: send messages [{message.type}] to client ({message.endPoint})");
-
-        NetworkPackage package = new(message.type, message.GetBytes());
-
-        byte[] data = package.GetBytes();
-
-        await _server.SendAsync(data, data.Length, message.endPoint);
-
-        Debug.Log($"Message send to {message.endPoint} sucessful");
-    }
-
-    private async void SendMessageToClient(byte[] data, IPEndPoint endPoint)
-    {
-        await _server.SendAsync(data, data.Length, endPoint);
-
-        Debug.Log($"Message send to {endPoint} sucessful");
     }
 
     public void SendMessageToClients(NetworkPackage package)
@@ -150,6 +136,50 @@ public class Server : MonoBehaviour
         {
             SendMessageToClient(data, user.Value.userEndPoint);
         }
+    }
+
+    public void SendMessageToClient(NetworkMessage message)
+    {
+        Debug.Log($"Server: send messages [{message.type}] to client ({message.endPoint})");
+
+        NetworkPackage package = new(message.type, message.GetBytes());
+
+        byte[] data = package.GetBytes();
+
+        SendMessageToClient(data, message.endPoint);
+    }
+
+    private async void SendMessageToClient(byte[] data, IPEndPoint endPoint)
+    {
+        int retryCount = 0;
+
+        while (retryCount < _maxRetries)
+        {
+            try
+            {
+                await _server.SendAsync(data, data.Length, endPoint);
+
+                Debug.Log($"Message send to {endPoint} sucessful");
+
+                return;
+            }
+            catch (SocketException ex) when (ex.SocketErrorCode == SocketError.TimedOut)
+            {
+                // time out 
+                Debug.LogWarning($"Connection timed out: {ex.Message}");
+                retryCount++;
+            }
+            catch (Exception ex)
+            {
+                // Another error
+                Debug.LogWarning($"Connection error : {ex.Message}.");
+                return;
+            }
+        }
+
+        Debug.LogWarning($"Server: Failed to send message after {_maxRetries} retries.");
+
+        return;
     }
 
     private void CloseServerUDP()
