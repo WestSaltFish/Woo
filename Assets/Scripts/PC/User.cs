@@ -1,5 +1,4 @@
 using System.Net;
-using System.Numerics;
 
 public struct UserSensorData
 {

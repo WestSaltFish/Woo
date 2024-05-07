@@ -10,7 +10,7 @@ public enum MobileSensorFlag
     Velocity = 1 << 0,      // 00000001
     Acceleration = 1 << 1,  // 00000010
     Gravity = 1 << 2,       // 00000100
-    Rotation = 1 << 3       // 00001000
+    Rotation = 1 << 3,       // 00001000
 }
 
 public class MobileSensor : MonoBehaviour
@@ -21,12 +21,14 @@ public class MobileSensor : MonoBehaviour
     public Vector3 Acceleration { get => _currentAcceleration; }
     public Vector3 Gravity { get => _currentGravity; }
     public Vector3 Rotation { get => _currentRotation; }
+    public Quaternion Quaternion { get => _currenQuat; }
 
 
     private Vector3 _currentVelocity;
     private Vector3 _currentAcceleration;
     private Vector3 _currentGravity;
     private Vector3 _currentRotation;
+    private Quaternion _currenQuat;
 
     // Start is called before the first frame update
     void Start()
@@ -46,6 +48,7 @@ public class MobileSensor : MonoBehaviour
         UpdateVelocity();
 
         _currentRotation = Input.gyro.attitude.eulerAngles;
+        _currenQuat = Input.gyro.attitude;
 
         debugMeesage.text = $"Acc: {_currentAcceleration} " +
             $"\n\nAccMag: {_currentAcceleration.magnitude}" +

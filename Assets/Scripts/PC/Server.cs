@@ -2,13 +2,9 @@ using System;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Net;
-using System.Net.NetworkInformation;
 using System.Net.Sockets;
 using UnityEngine;
 using TMPro;
-using UnityEditor.PackageManager;
-using UnityEditor.VersionControl;
-using System.Threading.Tasks;
 
 public class Server : MonoBehaviour
 {
@@ -53,7 +49,8 @@ public class Server : MonoBehaviour
 
         StartServerAsync();
 
-        debugText.text = GetLocalIPAddress();
+        if (debugText != null)
+            debugText.text = GetLocalIPAddress();
     }
 
     void Update()
@@ -92,15 +89,12 @@ public class Server : MonoBehaviour
 
     async private void ListenForClientAsync()
     {
-        if (_connected)
+        while (_connected)
         {
             try
             {
                 // Receive result async
                 UdpReceiveResult result = await _server.ReceiveAsync();
-
-                // Start to listen immediatly
-                ListenForClientAsync();
 
                 // get message
                 NetworkMessage message = NetworkPackage.GetDataFromBytes(result.Buffer, result.Buffer.Length);
@@ -215,37 +209,15 @@ public class Server : MonoBehaviour
 
     public string GetLocalIPAddress()
     {
-        string localIP = string.Empty;
+        IPHostEntry ipEntry = Dns.GetHostEntry(Dns.GetHostName());
 
-        // 获取所有网络接口
-        NetworkInterface[] networkInterfaces = NetworkInterface.GetAllNetworkInterfaces();
-
-        foreach (NetworkInterface networkInterface in networkInterfaces)
+        foreach (IPAddress ip in ipEntry.AddressList)
         {
-            // 过滤掉虚拟和回环接口
-            if (networkInterface.NetworkInterfaceType == NetworkInterfaceType.Ethernet ||
-                networkInterface.NetworkInterfaceType == NetworkInterfaceType.Wireless80211)
-            {
-                // 获取网络接口的 IP 属性
-                IPInterfaceProperties ipProperties = networkInterface.GetIPProperties();
-
-                foreach (UnicastIPAddressInformation ipAddressInfo in ipProperties.UnicastAddresses)
-                {
-                    // 过滤 IPv6 地址和回环地址
-                    if (ipAddressInfo.Address.AddressFamily == AddressFamily.InterNetwork &&
-                        !IPAddress.IsLoopback(ipAddressInfo.Address))
-                    {
-                        localIP = ipAddressInfo.Address.ToString();
-                        break;
-                    }
-                }
-
-                if (!string.IsNullOrEmpty(localIP))
-                    break;
-            }
+            if (ip.AddressFamily == AddressFamily.InterNetwork)
+                return ip.ToString();
         }
 
-        return localIP;
+        return "0.0.0.0";
     }
     #endregion
 
@@ -330,19 +302,19 @@ public class Server : MonoBehaviour
             {
                 if ((_sensorEnable & MobileSensorFlag.Velocity) != 0)
                 {
-                    user.senserData.Velocity = msg.mobileSensorData[MobileSensorFlag.Velocity];
+                    user.senserData.Velocity = msg.vel;
                 }
                 if ((_sensorEnable & MobileSensorFlag.Acceleration) != 0)
                 {
-                    user.senserData.Acceleration = msg.mobileSensorData[MobileSensorFlag.Acceleration];
+                    user.senserData.Acceleration = msg.acc;
                 }
                 if ((_sensorEnable & MobileSensorFlag.Rotation) != 0)
                 {
-                    user.senserData.Rotation = msg.mobileSensorData[MobileSensorFlag.Rotation];
+                    user.senserData.Rotation = msg.rot;
                 }
                 if ((_sensorEnable & MobileSensorFlag.Gravity) != 0)
                 {
-                    user.senserData.Gravity = msg.mobileSensorData[MobileSensorFlag.Gravity];
+                    user.senserData.Gravity = msg.grav;
                 }
             }
             catch (Exception ex)

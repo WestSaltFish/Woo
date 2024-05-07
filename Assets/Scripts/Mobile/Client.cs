@@ -18,7 +18,7 @@ public class Client : MonoBehaviour
     // Network params
     [Header("Network params")]
     [SerializeField, Disable] private bool _connected = false;
-    [SerializeField] private string _serverIp = "169.254.72.24";
+    [SerializeField] private string _serverIp = "192.168.1.38";
     [SerializeField] private int _serverPort = 8888;
     [SerializeField] private int _maxRetries = 3;
     private IPEndPoint _serverEndPoint;
@@ -30,6 +30,7 @@ public class Client : MonoBehaviour
     private MobileSensor _mobileSensor;
 
     public TMP_Text _debugText;
+    public TMP_InputField _debugInput;
 
     #region Unity evets
 
@@ -41,6 +42,11 @@ public class Client : MonoBehaviour
         _actionHandles.Add(NetworkMessageType.LeaveServer, HandleLeaveServer);
         _actionHandles.Add(NetworkMessageType.MobileSensorEnable, HandleSensorEnable);
         _actionHandles.Add(NetworkMessageType.MobileSensorData, HandleSensorData);
+
+        _debugText.text = $"your IP: {GetLocalIPAddress()}";
+
+        if (_debugInput != null)
+            _debugInput.text = _serverIp;
     }
 
     private void Update()
@@ -56,12 +62,12 @@ public class Client : MonoBehaviour
         {
             RequestConnectToServer();
         }
-        else if(Input.GetKeyDown(KeyCode.D))
+        else if (Input.GetKeyDown(KeyCode.D))
         {
             RequestLeaveFromServer();
         }
 
-        RequestSendSensorData(); 
+        RequestSendSensorData();
     }
 
     private void OnDestroy()
@@ -140,9 +146,9 @@ public class Client : MonoBehaviour
         }
 
         Debug.LogWarning($"Client: Failed to send message after {_maxRetries} retries.");
-        
+
         _debugText.text = $"Client: Failed to send message after {_maxRetries} retries.";
-        
+
         CloseClientUDP();
 
         return false;
@@ -152,7 +158,7 @@ public class Client : MonoBehaviour
     {
         _serverPort = port;
     }
- 
+
     private void CloseClientUDP()
     {
         _connected = false;
@@ -164,12 +170,26 @@ public class Client : MonoBehaviour
             Debug.Log("Client close!");
         }
     }
+
+    public string GetLocalIPAddress()
+    {
+        IPHostEntry ipEntry = Dns.GetHostEntry(Dns.GetHostName());
+
+        foreach (IPAddress ip in ipEntry.AddressList)
+        {
+            if (ip.AddressFamily == AddressFamily.InterNetwork)
+                return ip.ToString();
+        }
+
+        return "0.0.0.0";
+    }
     #endregion
 
     #region Requests
     public async void RequestConnectToServer()
     {
-        if(_client == null)
+        _debugText.text = "Trying connect.";
+        if (_client == null)
         {
             // Get Server Port
             _serverEndPoint = new IPEndPoint(IPAddress.Parse(_serverIp), _serverPort);
@@ -179,9 +199,13 @@ public class Client : MonoBehaviour
 
             _client.Connect(_serverEndPoint);
 
+            _debugText.text = $"connected";
+
             bool suc = await SendMessageToServer(NetworkMessageFactory.JoinServerMessage(uid, _name));
 
-            if(suc)
+            _debugText.text = $"message send: {suc}";
+
+            if (suc)
             {
                 _connected = suc;
 
@@ -200,7 +224,7 @@ public class Client : MonoBehaviour
 
     private async void RequestSendSensorData()
     {
-        if (_client != null && _sensorFlag != MobileSensorFlag.None) 
+        if (_client != null && _sensorFlag != MobileSensorFlag.None)
         {
             if ((_sensorFlag & MobileSensorFlag.Velocity) != 0)
             {
@@ -219,7 +243,8 @@ public class Client : MonoBehaviour
                 _sensorValues[MobileSensorFlag.Gravity] = _mobileSensor.Gravity;
             }
 
-            bool suc = await SendMessageToServer(NetworkMessageFactory.MobileSensorDataMessage(uid, _sensorValues));
+
+            bool suc = await SendMessageToServer(NetworkMessageFactory.MobileSensorDataMessage(uid, _sensorValues,_mobileSensor.Quaternion));
         }
     }
 
@@ -235,7 +260,7 @@ public class Client : MonoBehaviour
             uid = message.ownerUID;
             Debug.Log("Join server successful");
 
-            if (_debugText != null) 
+            if (_debugText != null)
                 _debugText.text = "Join server successful";
         }
         else
@@ -251,7 +276,7 @@ public class Client : MonoBehaviour
     {
         var message = data as LeaveServer;
 
-        if(message.successful || message.errorCode == NetworkErrorCode.ClientAlreadyLeaveTheServer || _client == null)
+        if (message.successful || message.errorCode == NetworkErrorCode.ClientAlreadyLeaveTheServer || _client == null)
         {
             uid = 0;
             CloseClientUDP();

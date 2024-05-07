@@ -121,9 +121,9 @@ public class NetworkMessageFactory
         return new NetworkPackage(NetworkMessageType.LeaveServer, msg.GetBytes());
     }
 
-    static public NetworkPackage MobileSensorDataMessage(uint uid, Dictionary<MobileSensorFlag, Vector3> mobileSensordata)
+    static public NetworkPackage MobileSensorDataMessage(uint uid, Dictionary<MobileSensorFlag, Vector3> mobileSensordata, Quaternion quat)
     {
-        MobileSensorData msg = new(uid, mobileSensordata);
+        MobileSensorData msg = new(uid, mobileSensordata, quat);
 
         return new NetworkPackage(NetworkMessageType.MobileSensorData, msg.GetBytes());
     }
@@ -181,6 +181,7 @@ public class Message : NetworkMessage
     public string message;
 }
 
+[Serializable]
 public class MobileSensorEnable : NetworkMessage
 {
     public MobileSensorEnable(MobileSensorFlag enableFlag) : base(NetworkMessageType.MobileSensorEnable, 0)
@@ -192,13 +193,25 @@ public class MobileSensorEnable : NetworkMessage
     public MobileSensorFlag enableFlag;
 }
 
+[Serializable]
 public class MobileSensorData : NetworkMessage
 {
-    public MobileSensorData(uint userId, Dictionary<MobileSensorFlag, Vector3> mobileSensorData) : base(NetworkMessageType.MobileSensorData, userId)
+    public MobileSensorData(uint userId, Dictionary<MobileSensorFlag, Vector3> mobileSensorData, Quaternion quat) : base(NetworkMessageType.MobileSensorData, userId)
     {
-        this.mobileSensorData = mobileSensorData;
+        //this.mobileSensorData = mobileSensorData;
+
+        rot = mobileSensorData[MobileSensorFlag.Rotation];
+        this.quat = quat;
+        //vel = mobileSensorData[MobileSensorFlag.Velocity];
+        //acc = mobileSensorData[MobileSensorFlag.Acceleration];
+        //grav = mobileSensorData[MobileSensorFlag.Gravity];
     }
 
     // 4 server
-    public Dictionary<MobileSensorFlag, Vector3> mobileSensorData;
+    //public Dictionary<MobileSensorFlag, Vector3> mobileSensorData;
+    public Vector3 rot;
+    public Vector3 vel;
+    public Vector3 acc;
+    public Vector3 grav;
+    public Quaternion quat;
 }
