@@ -5,6 +5,8 @@ using System.Net;
 using System.Net.Sockets;
 using UnityEngine;
 using TMPro;
+using System.Net.NetworkInformation;
+using System.Linq;
 
 public class Server : MonoBehaviour
 {
@@ -49,8 +51,10 @@ public class Server : MonoBehaviour
 
         StartServerAsync();
 
+        
         if (debugText != null)
             debugText.text = GetLocalIPAddress();
+        
     }
 
     void Update()
@@ -192,7 +196,7 @@ public class Server : MonoBehaviour
 
     #region Requests
 
-    private void RequestEnableSensor()
+    public void RequestEnableSensor()
     {
         var msg = NetworkMessageFactory.MobileSensorEnableMessage(_sensorEnable);
 
@@ -209,15 +213,30 @@ public class Server : MonoBehaviour
 
     public string GetLocalIPAddress()
     {
-        IPHostEntry ipEntry = Dns.GetHostEntry(Dns.GetHostName());
+        string wifiIpAddress = "0.0.0.0";
 
-        foreach (IPAddress ip in ipEntry.AddressList)
+        // Get all network interface
+        NetworkInterface[] interfaces = NetworkInterface.GetAllNetworkInterfaces();
+
+        foreach (NetworkInterface iface in interfaces)
         {
-            if (ip.AddressFamily == AddressFamily.InterNetwork)
-                return ip.ToString();
+            // Only find wifi interface
+            if (iface.OperationalStatus == OperationalStatus.Up && iface.NetworkInterfaceType == NetworkInterfaceType.Wireless80211)
+            {
+                IPInterfaceProperties ipProperties = iface.GetIPProperties();
+
+                // Get a unic ip adress
+                UnicastIPAddressInformation ipAddress = ipProperties.UnicastAddresses.FirstOrDefault(addr => addr.Address.AddressFamily == AddressFamily.InterNetwork);
+
+                if (ipAddress != null)
+                {
+                    wifiIpAddress = ipAddress.Address.ToString();
+                    break;
+                }
+            }
         }
 
-        return "0.0.0.0";
+        return wifiIpAddress;
     }
     #endregion
 

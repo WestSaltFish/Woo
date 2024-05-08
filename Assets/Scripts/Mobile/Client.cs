@@ -18,7 +18,7 @@ public class Client : MonoBehaviour
     // Network params
     [Header("Network params")]
     [SerializeField, Disable] private bool _connected = false;
-    [SerializeField] private string _serverIp = "192.168.1.38";
+    [SerializeField, Disable] private string _serverIp = "0.0.0.0";
     [SerializeField] private int _serverPort = 8888;
     [SerializeField] private int _maxRetries = 3;
     private IPEndPoint _serverEndPoint;
@@ -44,9 +44,6 @@ public class Client : MonoBehaviour
         _actionHandles.Add(NetworkMessageType.MobileSensorData, HandleSensorData);
 
         _debugText.text = $"your IP: {GetLocalIPAddress()}";
-
-        if (_debugInput != null)
-            _debugInput.text = _serverIp;
     }
 
     private void Update()
@@ -171,6 +168,11 @@ public class Client : MonoBehaviour
         }
     }
 
+    public void SetServerIP(string ip)
+    {
+        _serverIp = ip;
+    }
+
     public string GetLocalIPAddress()
     {
         IPHostEntry ipEntry = Dns.GetHostEntry(Dns.GetHostName());
@@ -189,6 +191,9 @@ public class Client : MonoBehaviour
     public async void RequestConnectToServer()
     {
         _debugText.text = "Trying connect.";
+
+        SetServerIP(_debugInput.text);
+
         if (_client == null)
         {
             // Get Server Port
@@ -197,20 +202,31 @@ public class Client : MonoBehaviour
             // Init client udp
             _client = new();
 
-            _client.Connect(_serverEndPoint);
-
-            _debugText.text = $"connected";
-
-            bool suc = await SendMessageToServer(NetworkMessageFactory.JoinServerMessage(uid, _name));
-
-            _debugText.text = $"message send: {suc}";
-
-            if (suc)
+            try
             {
-                _connected = suc;
+                _client.Connect(_serverEndPoint);
 
-                ReceiveMessagesAsync();
+                _debugText.text = "connected";
+
+                bool suc = await SendMessageToServer(NetworkMessageFactory.JoinServerMessage(uid, _name));
+
+                _debugText.text = $"message send: {suc}";
+
+                if (suc)
+                {
+                    _connected = suc;
+
+                    ReceiveMessagesAsync();
+                }
             }
+            catch (Exception ex)
+            {
+                _debugText.text = $"Connect to server fail: {ex}.";
+
+                Debug.Log($"Connect to server fail: {ex}.");
+
+                CloseClientUDP();
+            }   
         }
     }
 
