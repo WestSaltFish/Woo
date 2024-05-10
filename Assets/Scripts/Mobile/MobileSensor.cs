@@ -91,7 +91,7 @@ public class MobileSensor : MonoBehaviour
         return Input.gyro.gravity;
     }
 
-    public Vector3 GetEuglerAngle()
+    public Vector3 GetEulerAngle()
     {
         return Input.gyro.attitude.eulerAngles;
     }
