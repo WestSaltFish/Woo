@@ -74,13 +74,13 @@ public class NetworkPackage
 [Serializable]
 public class NetworkMessage
 {
-    protected NetworkMessage(NetworkMessageType type, uint ownerUid)
+    protected NetworkMessage(NetworkMessageType type, uint ownerUID)
     {
         this.type = type;
-        this.ownerUID = ownerUid;
+        this.ownerUID = ownerUID;
     }
 
-    virtual public byte[] GetBytes()
+    public byte[] GetBytes()
     {
         return Encoding.ASCII.GetBytes(JsonUtility.ToJson(this));
     }
