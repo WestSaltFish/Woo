@@ -11,9 +11,13 @@ public enum NetworkMessageType
     LeaveServer,
     Heartbeat,
     CloseServer,
-    Message,
     MobileSensorEnable,
     MobileSensorData,
+
+    // Customer types
+    MyMessage,
+
+    //Last one
     MaxCount,
 }
 
@@ -63,6 +67,7 @@ public class NetworkPackage
         { NetworkMessageType.LeaveServer, GetData<LeaveServer> },
         { NetworkMessageType.MobileSensorEnable, GetData<MobileSensorEnable> },
         { NetworkMessageType.MobileSensorData, GetData<MobileSensorData> },
+        { NetworkMessageType.MyMessage, GetData<MyMessage> },
     };
 
     static public T GetData<T>(byte[] data)
@@ -100,6 +105,7 @@ public class NetworkMessage
 
 public class NetworkMessageFactory
 {
+    // Client request
     static public NetworkPackage JoinServerMessage(uint uid, string userName)
     {
         JoinServer msg = new(uid, userName);
@@ -135,10 +141,19 @@ public class NetworkMessageFactory
 
         return new NetworkPackage(NetworkMessageType.MobileSensorEnable, msg.GetBytes());
     }
+
+    // Custom request
+    static public NetworkPackage MyMessage(uint uid, string message)
+    {
+        MyMessage msg = new(uid, message);
+
+        return new NetworkPackage(NetworkMessageType.LeaveServer, msg.GetBytes());
+    }
+
 }
 
 // -----------------------------------------------
-// ------------REQUEST IN THE SERVER--------------
+// -------------------REQUESTS--------------------
 // -----------------------------------------------
 
 [Serializable]
@@ -163,24 +178,42 @@ public class JoinServer : NetworkMessage
 [Serializable]
 public class LeaveServer : NetworkMessage
 {
-    public LeaveServer(uint userId, bool forceLeave = false) : base(NetworkMessageType.LeaveServer, userId)
+    public LeaveServer(uint uid, bool forceLeave = false) : base(NetworkMessageType.LeaveServer, uid)
     {
         successful = forceLeave;
     }
 }
 
 [Serializable]
-public class Message : NetworkMessage
+public class CloseServer : NetworkMessage
 {
-    public Message(uint userId, string message) : base(NetworkMessageType.Message, userId)
+    public CloseServer(uint uid, bool forceLeave = false) : base(NetworkMessageType.LeaveServer, uid)
     {
-        this.message = message;
+        successful = forceLeave;
+    }
+}
+
+[Serializable]
+public class MobileSensorData : NetworkMessage
+{
+    public MobileSensorData(uint uid, Dictionary<MobileSensorFlag, Vector3> mobileSensorData, Quaternion quat) : base(NetworkMessageType.MobileSensorData, uid)
+    {
+        this.quat = quat;
+        rot = mobileSensorData[MobileSensorFlag.Rotation];
+        //vel = mobileSensorData[MobileSensorFlag.Velocity];
+        //acc = mobileSensorData[MobileSensorFlag.Acceleration];
+        //grav = mobileSensorData[MobileSensorFlag.Gravity];
     }
 
     // 4 server
-    public string message;
+    public Vector3 rot;
+    public Vector3 vel;
+    public Vector3 acc;
+    public Vector3 grav;
+    public Quaternion quat;
 }
 
+/// Server 2 Client
 [Serializable]
 public class MobileSensorEnable : NetworkMessage
 {
@@ -193,25 +226,16 @@ public class MobileSensorEnable : NetworkMessage
     public MobileSensorFlag enableFlag;
 }
 
-[Serializable]
-public class MobileSensorData : NetworkMessage
-{
-    public MobileSensorData(uint userId, Dictionary<MobileSensorFlag, Vector3> mobileSensorData, Quaternion quat) : base(NetworkMessageType.MobileSensorData, userId)
-    {
-        //this.mobileSensorData = mobileSensorData;
+// -----------------------------------------------
+// ---------------CUSTOM REQUESTS-----------------
+// -----------------------------------------------
 
-        rot = mobileSensorData[MobileSensorFlag.Rotation];
-        this.quat = quat;
-        //vel = mobileSensorData[MobileSensorFlag.Velocity];
-        //acc = mobileSensorData[MobileSensorFlag.Acceleration];
-        //grav = mobileSensorData[MobileSensorFlag.Gravity];
+public class MyMessage : NetworkMessage
+{
+    public MyMessage(uint uid, string message) : base(NetworkMessageType.MyMessage, uid)
+    {
+        this.message = message;
     }
 
-    // 4 server
-    //public Dictionary<MobileSensorFlag, Vector3> mobileSensorData;
-    public Vector3 rot;
-    public Vector3 vel;
-    public Vector3 acc;
-    public Vector3 grav;
-    public Quaternion quat;
+    public string message;
 }
